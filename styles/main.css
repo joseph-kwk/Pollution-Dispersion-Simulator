@@ -12,7 +12,8 @@ canvas {
 
 /* Control panel styles */
 .control-group {
-    margin-bottom: 1rem;
+    margin-bottom: 1.5rem;
+    width: 100%;
 }
 
 .control-group label {
@@ -20,11 +21,37 @@ canvas {
     font-weight: 500;
     color: #4a5568;
     margin-bottom: 0.5rem;
+    font-size: 0.875rem;
 }
 
 .control-group input[type="range"] {
     width: 100%;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.5rem;
+    height: 4px;
+    background-color: #e2e8f0;
+    border-radius: 9999px;
+    appearance: none;
+    cursor: pointer;
+}
+
+.control-group input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background-color: #3b82f6;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 200ms;
+}
+
+.control-group input[type="range"]::-webkit-slider-thumb:hover {
+    background-color: #2563eb;
+    transform: scale(1.1);
+}
+
+.control-group span {
+    font-size: 0.875rem;
+    color: #4a5568;
 }
 
 /* Button styles */
@@ -34,6 +61,10 @@ canvas {
     font-weight: 600;
     transition: all 200ms;
     cursor: pointer;
+    min-width: 100px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .btn-primary {
@@ -45,6 +76,10 @@ canvas {
     background-color: #1d4ed8;
 }
 
+.btn-primary:active {
+    background-color: #1e40af;
+}
+
 .btn-secondary {
     background-color: #e5e7eb;
     color: #1f2937;
@@ -54,6 +89,10 @@ canvas {
     background-color: #d1d5db;
 }
 
+.btn-secondary:active {
+    background-color: #9ca3af;
+}
+
 .btn-danger {
     background-color: #ef4444;
     color: white;
@@ -61,6 +100,10 @@ canvas {
 
 .btn-danger:hover {
     background-color: #dc2626;
+}
+
+.btn-danger:active {
+    background-color: #b91c1c;
 }
 
 /* Legend styles */
