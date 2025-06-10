@@ -25,25 +25,98 @@ function resizeCanvas() {
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw grid cells
+    // Draw base water effect
+    ctx.fillStyle = 'rgb(235, 245, 255)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw wave pattern
+    const time = Date.now() / 1000;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.beginPath();
+    for (let x = 0; x < canvas.width; x += 20) {
+        for (let y = 0; y < canvas.height; y += 20) {
+            const offsetX = Math.sin(y * 0.02 + time) * 5;
+            const offsetY = Math.cos(x * 0.02 + time) * 5;
+            ctx.moveTo(x + offsetX, y);
+            ctx.lineTo(x + offsetX + 10, y + offsetY);
+        }
+    }
+    ctx.stroke();
+
+    // Draw grid cells with pollution effects
     for (let r = 0; r < GRID_SIZE; r++) {
         for (let c = 0; c < GRID_SIZE; c++) {
             const density = window.pollutantGrid[r][c];
             if (density > 0) {
-                ctx.fillStyle = window.getColorForDensity(density);
+                const pollutantType = POLLUTANT_TYPES[window.pollutionSource.type];
+                const color = window.getColorForDensity(density, window.pollutionSource.type).color;
+                
+                // Draw main pollutant
+                ctx.fillStyle = color;
+                ctx.globalAlpha = Math.min(0.9, density / 255);
                 ctx.fillRect(
                     c * window.CELL_SIZE,
                     r * window.CELL_SIZE,
                     window.CELL_SIZE,
                     window.CELL_SIZE
                 );
+                
+                // Add type-specific visual effects
+                if (pollutantType.behavior.sinkRate < 0) {
+                    // Surface sheen effect for floating pollutants
+                    ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(0.3, density / 255)})`;
+                    ctx.fillRect(
+                        c * window.CELL_SIZE,
+                        r * window.CELL_SIZE,
+                        window.CELL_SIZE,
+                        window.CELL_SIZE / 4
+                    );
+                }
+                
+                if (pollutantType.effects.includes('algaeGrowth') && density > 100) {
+                    // Add algae effect for organic pollution
+                    ctx.fillStyle = 'rgba(34, 197, 94, 0.2)';
+                    ctx.beginPath();
+                    ctx.arc(
+                        c * window.CELL_SIZE + window.CELL_SIZE / 2,
+                        r * window.CELL_SIZE + window.CELL_SIZE / 2,
+                        window.CELL_SIZE / 3,
+                        0,
+                        Math.PI * 2
+                    );
+                    ctx.fill();
+                }
+                
+                if (pollutantType.effects.includes('temperature')) {
+                    // Heat distortion effect
+                    ctx.fillStyle = 'rgba(255, 140, 0, 0.1)';
+                    const waveOffset = Math.sin(Date.now() / 1000 + r + c) * window.CELL_SIZE / 4;
+                    ctx.fillRect(
+                        c * window.CELL_SIZE + waveOffset,
+                        r * window.CELL_SIZE,
+                        window.CELL_SIZE,
+                        window.CELL_SIZE
+                    );
+                }
+                
+                ctx.globalAlpha = 1.0;
             }
+            
+            // Add subtle grid lines for better visualization
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.strokeRect(
+                c * window.CELL_SIZE,
+                r * window.CELL_SIZE,
+                window.CELL_SIZE,
+                window.CELL_SIZE
+            );
         }
     }
 
     // Draw source
     if (window.pollutionSource) {
-        ctx.fillStyle = 'red';
+        const type = window.POLLUTANT_TYPES[window.pollutionSource.type];
+        ctx.fillStyle = `rgb(${type.baseColor.r}, ${type.baseColor.g}, ${type.baseColor.b})`;
         ctx.beginPath();
         ctx.arc(
             window.pollutionSource.x * window.CELL_SIZE + window.CELL_SIZE / 2,
@@ -143,17 +216,34 @@ document.getElementById('releaseRate').addEventListener('input', (event) => {
     document.getElementById('releaseRateValue').textContent = window.releaseRate;
 });
 
-// Initialize color legend
+// Pollution type selection
+document.getElementById('pollutionTypeSelect').addEventListener('change', (event) => {
+    window.pollutionSource.type = event.target.value;
+});
+
+// Initialize color legend with tooltips
 function initColorLegend() {
     const legend = document.getElementById('colorLegend');
-    const steps = 5;
-    for (let i = 0; i < steps; i++) {
-        const density = (255 * i) / (steps - 1);
-        const div = document.createElement('div');
-        div.className = 'legend-item';
-        div.style.backgroundColor = window.getColorForDensity(density);
-        legend.appendChild(div);
-    }
+    legend.innerHTML = ''; // Clear existing items
+
+    Object.entries(window.POLLUTANT_TYPES).forEach(([key, type]) => {
+        const legendItem = document.createElement('div');
+        legendItem.className = 'legend-item relative group cursor-help';
+        legendItem.style.backgroundColor = `rgb(${type.baseColor.r}, ${type.baseColor.g}, ${type.baseColor.b})`;
+
+        // Tooltip
+        const tooltip = document.createElement('div');
+        tooltip.className = 'absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10';
+        tooltip.innerHTML = `<strong>${type.name}</strong><br>${type.description}`;
+
+        // Arrow
+        const arrow = document.createElement('div');
+        arrow.className = 'absolute -bottom-1 left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900';
+
+        tooltip.appendChild(arrow);
+        legendItem.appendChild(tooltip);
+        legend.appendChild(legendItem);
+    });
 }
 
 // Initialize on window load

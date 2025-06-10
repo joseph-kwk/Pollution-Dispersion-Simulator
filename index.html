@@ -16,12 +16,19 @@
                 <canvas id="simulationCanvas" class="w-full h-full rounded-lg shadow-inner"></canvas>
                 <div id="messageBox" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black bg-opacity-70 text-white px-4 py-2 rounded-md hidden">
                 </div>
-            </div>
-
-            <!-- Color Legend -->
-            <div class="flex items-center gap-2 text-sm text-gray-700">
-                <span class="mr-2">Pollution Density:</span>
-                <div id="colorLegend" class="flex items-center gap-1">
+            </div>            <!-- Color Legend -->
+            <div class="flex flex-col gap-4 text-sm text-gray-700 p-4 bg-white rounded-lg shadow-sm">
+                <div class="flex items-center justify-between">
+                    <span class="font-medium">Pollution Types:</span>
+                    <select id="pollutionTypeSelect" class="px-3 py-1 rounded border border-gray-300 text-sm">
+                        <option value="CHEMICAL">Chemical</option>
+                        <option value="OIL">Oil Spill</option>
+                        <option value="SEWAGE">Organic Waste</option>
+                        <option value="THERMAL">Thermal</option>
+                    </select>
+                </div>
+                <div id="colorLegend" class="grid grid-cols-4 gap-2">
+                    <!-- Legend items will be added here by JavaScript -->
                 </div>
             </div>
         </div>
