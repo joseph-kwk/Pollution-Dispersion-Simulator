@@ -12,6 +12,12 @@ window.windSpeed = 0.5;
 window.diffusionRate = 0.1;
 window.releaseRate = 10;
 
+// Add pollution type selection handler
+document.getElementById('pollutionTypeSelect').addEventListener('change', (event) => {
+    window.pollutionSource.type = event.target.value;
+    showMessage(`Changed pollution type to ${window.POLLUTANT_TYPES[event.target.value].name}`, 1500);
+});
+
 // Canvas sizing
 function resizeCanvas() {
     const size = Math.min(canvas.parentElement.offsetWidth, canvas.parentElement.offsetHeight);
@@ -29,27 +35,22 @@ function draw() {
     ctx.fillStyle = 'rgb(235, 245, 255)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Draw wave pattern
-    const time = Date.now() / 1000;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    // Draw subtle grid pattern
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
     ctx.beginPath();
-    for (let x = 0; x < canvas.width; x += 20) {
-        for (let y = 0; y < canvas.height; y += 20) {
-            const offsetX = Math.sin(y * 0.02 + time) * 5;
-            const offsetY = Math.cos(x * 0.02 + time) * 5;
-            ctx.moveTo(x + offsetX, y);
-            ctx.lineTo(x + offsetX + 10, y + offsetY);
-        }
+    for (let i = 0; i <= GRID_SIZE; i++) {
+        const pos = i * window.CELL_SIZE;
+        ctx.moveTo(pos, 0);
+        ctx.lineTo(pos, canvas.height);
+        ctx.moveTo(0, pos);
+        ctx.lineTo(canvas.width, pos);
     }
-    ctx.stroke();
-
-    // Draw grid cells with pollution effects
+    ctx.stroke();    // Draw grid cells with pollution effects
     for (let r = 0; r < GRID_SIZE; r++) {
         for (let c = 0; c < GRID_SIZE; c++) {
             const density = window.pollutantGrid[r][c];
             if (density > 0) {
-                const pollutantType = POLLUTANT_TYPES[window.pollutionSource.type];
-                const color = window.getColorForDensity(density, window.pollutionSource.type).color;
+                const color = window.getColorForDensity(density, window.pollutionSource.type);
                 
                 // Draw main pollutant
                 ctx.fillStyle = color;
@@ -188,7 +189,8 @@ canvas.addEventListener('click', (event) => {
 
         window.pollutionSource = {
             x: Math.floor(x / window.CELL_SIZE),
-            y: Math.floor(y / window.CELL_SIZE)
+            y: Math.floor(y / window.CELL_SIZE),
+            type: document.getElementById('pollutionTypeSelect').value // Preserve type selection
         };
         draw();
         showMessage("Pollution source placed!", 1500);
@@ -225,6 +227,26 @@ document.getElementById('pollutionTypeSelect').addEventListener('change', (event
 function initColorLegend() {
     const legend = document.getElementById('colorLegend');
     legend.innerHTML = ''; // Clear existing items
+    
+    // Create a legend item for each pollution type
+    Object.entries(window.POLLUTANT_TYPES).forEach(([key, type]) => {
+        const legendItem = document.createElement('div');
+        legendItem.className = 'legend-item relative cursor-help transform transition-transform hover:-translate-y-1';
+        legendItem.style.backgroundColor = window.getColorForDensity(200, key);
+        
+        // Create tooltip
+        const tooltip = document.createElement('div');
+        tooltip.className = 'absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 transition-opacity pointer-events-none whitespace-nowrap';
+        tooltip.style.width = 'max-content';
+        tooltip.innerHTML = `<strong>${type.name}</strong><br>${type.description}`;
+        
+        legendItem.appendChild(tooltip);
+        legend.appendChild(legendItem);
+        
+        // Show/hide tooltip
+        legendItem.addEventListener('mouseenter', () => tooltip.style.opacity = '1');
+        legendItem.addEventListener('mouseleave', () => tooltip.style.opacity = '0');
+    });
 
     Object.entries(window.POLLUTANT_TYPES).forEach(([key, type]) => {
         const legendItem = document.createElement('div');
@@ -249,6 +271,8 @@ function initColorLegend() {
 // Initialize on window load
 window.onload = () => {
     window.init(); // Initialize simulation
+    // Set initial pollution type from select
+    window.pollutionSource.type = document.getElementById('pollutionTypeSelect').value;
     resizeCanvas();
     initColorLegend();
     draw();

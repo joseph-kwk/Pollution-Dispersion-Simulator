@@ -129,76 +129,91 @@ function getInterpolatedDensity(grid, r, c) {
     return val;
 }
 
+// Helper function for simulation
+function moveAndDiffuse(r, c, amount, windVelX, windVelY, viscosity, diffusionRate, diffusionModifier) {
+    // Calculate new position based on wind and viscosity
+    const newR = r + windVelY * (1 / viscosity);
+    const newC = c + windVelX * (1 / viscosity);
+    
+    // Boundary check
+    if (newR >= 0 && newR < GRID_SIZE - 1 && newC >= 0 && newC < GRID_SIZE - 1) {
+        // Bilinear interpolation for smooth movement
+        const r0 = Math.floor(newR);
+        const c0 = Math.floor(newC);
+        const r1 = r0 + 1;
+        const c1 = c0 + 1;
+        
+        const fr = newR - r0;
+        const fc = newC - c0;
+        
+        // Movement distribution
+        const movementAmount = amount * 0.8; // 80% moves, 20% stays for stability
+        newPollutantGrid[r0][c0] += movementAmount * (1 - fr) * (1 - fc);
+        newPollutantGrid[r0][c1] += movementAmount * (1 - fr) * fc;
+        newPollutantGrid[r1][c0] += movementAmount * fr * (1 - fc);
+        newPollutantGrid[r1][c1] += movementAmount * fr * fc;
+        
+        // The rest stays in current position
+        newPollutantGrid[r][c] += amount * 0.2;
+    } else {
+        // If outside bounds, keep in current position
+        newPollutantGrid[r][c] += amount;
+    }
+    
+    // Apply diffusion
+    const effectiveDiffusion = diffusionRate * diffusionModifier * 0.25;
+    const neighbors = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+    
+    for (const [dr, dc] of neighbors) {
+        const nr = r + dr;
+        const nc = c + dc;
+        if (nr >= 0 && nr < GRID_SIZE && nc >= 0 && nc < GRID_SIZE) {
+            newPollutantGrid[nr][nc] += amount * effectiveDiffusion;
+        }
+    }
+}
+
 // Main simulation step
 function simulateStep() {
-    // Clear the new grid
+    // Get simulation parameters
+    const windAngleRad = (window.windDirection || 0) * Math.PI / 180;
+    const windVelX = (window.windSpeed || 0.5) * Math.cos(windAngleRad);
+    const windVelY = (window.windSpeed || 0.5) * Math.sin(windAngleRad);
+    const diffusionRate = window.diffusionRate || 0.1;
+    const pollutantType = POLLUTANT_TYPES[pollutionSource.type];
+    
+    // Reset new grid
     for (let r = 0; r < GRID_SIZE; r++) {
         for (let c = 0; c < GRID_SIZE; c++) {
             newPollutantGrid[r][c] = 0;
         }
     }
-
-    // Add pollutant at source with type-specific behavior
+    
+    // Add new pollutant at source
     if (pollutionSource && pollutionSource.x >= 0 && pollutionSource.y >= 0 &&
         pollutionSource.x < GRID_SIZE && pollutionSource.y < GRID_SIZE) {
-        const pollutantType = POLLUTANT_TYPES[pollutionSource.type];
-        const releaseAmount = window.releaseRate || 10;
-        
-        // Apply type-specific release behavior
-        pollutantGrid[pollutionSource.y][pollutionSource.x] += releaseAmount;
-        
-        // Type-specific initial dispersion
-        const { behavior } = pollutantType;
-        
-        // Handle vertical movement (sinking/floating)
-        if (behavior.sinkRate !== 0) {
-            const verticalOffset = Math.round(behavior.sinkRate * 2);
-            const newRow = Math.max(0, Math.min(GRID_SIZE - 1, pollutionSource.y + verticalOffset));
-            if (newRow !== pollutionSource.y) {
-                pollutantGrid[newRow][pollutionSource.x] += releaseAmount * 0.3;
-            }
-        }
-        
-        // Handle surface spread for floating pollutants (like oil)
-        if (behavior.sinkRate < 0) {
-            const spreadRadius = Math.abs(Math.round(behavior.sinkRate * 3));
-            for (let i = -spreadRadius; i <= spreadRadius; i++) {
-                const col = pollutionSource.x + i;
-                if (col >= 0 && col < GRID_SIZE) {
-                    pollutantGrid[pollutionSource.y][col] += releaseAmount * 0.1;
-                }
-            }
-        }
+        pollutantGrid[pollutionSource.y][pollutionSource.x] += window.releaseRate || 10;
     }
-
-    // Calculate wind vector components
-    const windAngleRad = (window.windDirection || 0) * Math.PI / 180;
-    const windVelX = (window.windSpeed || 0.5) * Math.cos(windAngleRad);
-    const windVelY = (window.windSpeed || 0.5) * Math.sin(windAngleRad);
-    const diffusionRate = window.diffusionRate || 0.1;
-
-    // Advection and Diffusion
+    
+    // Process movement and diffusion for each cell
     for (let r = 0; r < GRID_SIZE; r++) {
         for (let c = 0; c < GRID_SIZE; c++) {
-            // Advection
-            const prev_r = r - windVelY;
-            const prev_c = c - windVelX;
-            
-            const advectedDensity = getInterpolatedDensity(pollutantGrid, prev_r, prev_c);
-            newPollutantGrid[r][c] = advectedDensity;
-
-            // Diffusion
-            const diffusionFactor = 0.25 * diffusionRate; // Split among 4 neighbors
-            if (r > 0) newPollutantGrid[r-1][c] += pollutantGrid[r][c] * diffusionFactor;
-            if (r < GRID_SIZE-1) newPollutantGrid[r+1][c] += pollutantGrid[r][c] * diffusionFactor;
-            if (c > 0) newPollutantGrid[r][c-1] += pollutantGrid[r][c] * diffusionFactor;
-            if (c < GRID_SIZE-1) newPollutantGrid[r][c+1] += pollutantGrid[r][c] * diffusionFactor;
-            newPollutantGrid[r][c] += pollutantGrid[r][c] * (1 - diffusionRate);
+            if (pollutantGrid[r][c] > 0) {
+                moveAndDiffuse(
+                    r, c,
+                    pollutantGrid[r][c],
+                    windVelX,
+                    windVelY,
+                    pollutantType.behavior.viscosity,
+                    diffusionRate,
+                    pollutantType.diffusionModifier
+                );
+            }
         }
     }
-
-    // Apply decay and update grid
-    const decayFactor = 0.99;
+    
+    // Update grid with decay
+    const decayFactor = 0.995; // Slower decay for better visibility
     for (let r = 0; r < GRID_SIZE; r++) {
         for (let c = 0; c < GRID_SIZE; c++) {
             pollutantGrid[r][c] = Math.min(255, newPollutantGrid[r][c] * decayFactor);
@@ -208,21 +223,22 @@ function simulateStep() {
 
 // Animation loop
 function animate() {
-    if (!isRunning) {
-        return;
-    }
-
+    if (!isRunning) return;
     simulateStep();
-    window.draw(); // Call the draw function from ui.js
+    window.draw();
     animationFrameId = requestAnimationFrame(animate);
 }
 
 // Initialize simulation
 function init() {
     initializeGrid();
-    window.getColorForDensity = getColorForDensity; // Expose for ui.js
-    window.pollutantGrid = pollutantGrid; // Expose for ui.js
-    window.pollutionSource = pollutionSource; // Expose for ui.js
-    window.isRunning = isRunning; // Expose for ui.js
-    window.animate = animate; // Expose for ui.js
+    window.getColorForDensity = getColorForDensity;
+    window.pollutantGrid = pollutantGrid;
+    window.pollutionSource = pollutionSource;
+    window.isRunning = isRunning;
+    window.animate = animate;
+    window.POLLUTANT_TYPES = POLLUTANT_TYPES;
 }
+
+// Initialize when the script loads
+init();
