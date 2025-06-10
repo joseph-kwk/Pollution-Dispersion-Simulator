@@ -27,8 +27,19 @@
                         <option value="THERMAL">Thermal</option>
                     </select>
                 </div>
-                <div id="colorLegend" class="grid grid-cols-4 gap-2">
-                    <!-- Legend items will be added here by JavaScript -->
+                <div class="flex flex-col gap-3">
+                    <div class="grid grid-cols-2 gap-x-4">
+                        <div id="currentTypeLegend" class="flex items-center gap-2">
+                            <span class="text-xs font-medium">Current Type:</span>
+                            <div class="flex items-center gap-1">
+                                <div class="h-6 w-20 rounded density-gradient"></div>
+                                <span class="text-xs">Density →</span>
+                            </div>
+                        </div>
+                        <div id="colorLegend" class="grid grid-cols-4 gap-1">
+                            <!-- Legend items will be added here by JavaScript -->
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

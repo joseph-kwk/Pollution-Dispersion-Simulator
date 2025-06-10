@@ -108,33 +108,59 @@ canvas {
 
 /* Legend styles */
 .legend-item {
-    width: 40px;
-    height: 40px;
-    border-radius: 6px;
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
     transition: all 200ms;
     position: relative;
+    cursor: help;
 }
 
 .legend-item:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    border-color: rgba(255, 255, 255, 0.4);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border-color: rgba(0, 0, 0, 0.2);
 }
 
-.legend-item > div {
-    z-index: 50;
-    transition: opacity 150ms ease-in-out;
+.density-gradient {
+    background: linear-gradient(to right, rgba(235, 245, 255, 0.2), currentColor);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
 }
 
-/* Tooltip arrow */
-.legend-item > div::after {
+/* Tooltip styles */
+.tooltip {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%) translateY(-8px);
+    padding: 6px 8px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    font-size: 12px;
+    border-radius: 4px;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 200ms;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.legend-item:hover .tooltip {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(-4px);
+}
+
+.tooltip::after {
     content: '';
     position: absolute;
     top: 100%;
     left: 50%;
     transform: translateX(-50%);
-    border-width: 4px;
-    border-style: solid;
-    border-color: #1f2937 transparent transparent transparent;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 4px solid rgba(0, 0, 0, 0.8);
 }

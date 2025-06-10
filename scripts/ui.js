@@ -12,12 +12,6 @@ window.windSpeed = 0.5;
 window.diffusionRate = 0.1;
 window.releaseRate = 10;
 
-// Add pollution type selection handler
-document.getElementById('pollutionTypeSelect').addEventListener('change', (event) => {
-    window.pollutionSource.type = event.target.value;
-    showMessage(`Changed pollution type to ${window.POLLUTANT_TYPES[event.target.value].name}`, 1500);
-});
-
 // Canvas sizing
 function resizeCanvas() {
     const size = Math.min(canvas.parentElement.offsetWidth, canvas.parentElement.offsetHeight);
@@ -31,7 +25,7 @@ function resizeCanvas() {
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw base water effect
+    // Draw base water/air effect
     ctx.fillStyle = 'rgb(235, 245, 255)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
@@ -45,14 +39,19 @@ function draw() {
         ctx.moveTo(0, pos);
         ctx.lineTo(canvas.width, pos);
     }
-    ctx.stroke();    // Draw grid cells with pollution effects
+    ctx.stroke();
+
+    // Draw grid cells with pollution effects
+    const currentType = window.pollutionSource.type;
+    const pollutantType = window.POLLUTANT_TYPES[currentType];
+
     for (let r = 0; r < GRID_SIZE; r++) {
         for (let c = 0; c < GRID_SIZE; c++) {
             const density = window.pollutantGrid[r][c];
             if (density > 0) {
-                const color = window.getColorForDensity(density, window.pollutionSource.type);
+                const color = window.getColorForDensity(density, currentType);
                 
-                // Draw main pollutant
+                // Draw main pollutant with proper alpha blending
                 ctx.fillStyle = color;
                 ctx.globalAlpha = Math.min(0.9, density / 255);
                 ctx.fillRect(
@@ -62,7 +61,7 @@ function draw() {
                     window.CELL_SIZE
                 );
                 
-                // Add type-specific visual effects
+                // Add type-specific visual effects based on pollutant behavior
                 if (pollutantType.behavior.sinkRate < 0) {
                     // Surface sheen effect for floating pollutants
                     ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(0.3, density / 255)})`;
@@ -89,7 +88,7 @@ function draw() {
                 }
                 
                 if (pollutantType.effects.includes('temperature')) {
-                    // Heat distortion effect
+                    // Heat distortion effect for thermal pollution
                     ctx.fillStyle = 'rgba(255, 140, 0, 0.1)';
                     const waveOffset = Math.sin(Date.now() / 1000 + r + c) * window.CELL_SIZE / 4;
                     ctx.fillRect(
@@ -102,22 +101,12 @@ function draw() {
                 
                 ctx.globalAlpha = 1.0;
             }
-            
-            // Add subtle grid lines for better visualization
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-            ctx.strokeRect(
-                c * window.CELL_SIZE,
-                r * window.CELL_SIZE,
-                window.CELL_SIZE,
-                window.CELL_SIZE
-            );
         }
     }
 
-    // Draw source
+    // Draw pollution source with type-specific color
     if (window.pollutionSource) {
-        const type = window.POLLUTANT_TYPES[window.pollutionSource.type];
-        ctx.fillStyle = `rgb(${type.baseColor.r}, ${type.baseColor.g}, ${type.baseColor.b})`;
+        ctx.fillStyle = `rgb(${pollutantType.baseColor.r}, ${pollutantType.baseColor.g}, ${pollutantType.baseColor.b})`;
         ctx.beginPath();
         ctx.arc(
             window.pollutionSource.x * window.CELL_SIZE + window.CELL_SIZE / 2,
@@ -127,6 +116,11 @@ function draw() {
             Math.PI * 2
         );
         ctx.fill();
+
+        // Add source indicator ring
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
     }
 }
 
@@ -231,42 +225,37 @@ function initColorLegend() {
     // Create a legend item for each pollution type
     Object.entries(window.POLLUTANT_TYPES).forEach(([key, type]) => {
         const legendItem = document.createElement('div');
-        legendItem.className = 'legend-item relative cursor-help transform transition-transform hover:-translate-y-1';
-        legendItem.style.backgroundColor = window.getColorForDensity(200, key);
+        legendItem.className = 'legend-item';
+        legendItem.style.backgroundColor = `rgb(${type.baseColor.r}, ${type.baseColor.g}, ${type.baseColor.b})`;
         
         // Create tooltip
         const tooltip = document.createElement('div');
-        tooltip.className = 'absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 transition-opacity pointer-events-none whitespace-nowrap';
-        tooltip.style.width = 'max-content';
-        tooltip.innerHTML = `<strong>${type.name}</strong><br>${type.description}`;
+        tooltip.className = 'tooltip';
+        tooltip.textContent = type.name;
         
         legendItem.appendChild(tooltip);
         legend.appendChild(legendItem);
-        
-        // Show/hide tooltip
-        legendItem.addEventListener('mouseenter', () => tooltip.style.opacity = '1');
-        legendItem.addEventListener('mouseleave', () => tooltip.style.opacity = '0');
     });
 
-    Object.entries(window.POLLUTANT_TYPES).forEach(([key, type]) => {
-        const legendItem = document.createElement('div');
-        legendItem.className = 'legend-item relative group cursor-help';
-        legendItem.style.backgroundColor = `rgb(${type.baseColor.r}, ${type.baseColor.g}, ${type.baseColor.b})`;
-
-        // Tooltip
-        const tooltip = document.createElement('div');
-        tooltip.className = 'absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10';
-        tooltip.innerHTML = `<strong>${type.name}</strong><br>${type.description}`;
-
-        // Arrow
-        const arrow = document.createElement('div');
-        arrow.className = 'absolute -bottom-1 left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900';
-
-        tooltip.appendChild(arrow);
-        legendItem.appendChild(tooltip);
-        legend.appendChild(legendItem);
-    });
+    // Update current type gradient colors
+    updateCurrentTypeGradient();
 }
+
+// Update density gradient for current pollution type
+function updateCurrentTypeGradient() {
+    const currentType = window.pollutionSource.type;
+    const type = window.POLLUTANT_TYPES[currentType];
+    const gradient = document.querySelector('.density-gradient');
+    
+    gradient.style.color = `rgb(${type.baseColor.r}, ${type.baseColor.g}, ${type.baseColor.b})`;
+}
+
+// Add pollution type change handler
+document.getElementById('pollutionTypeSelect').addEventListener('change', (event) => {
+    window.pollutionSource.type = event.target.value;
+    updateCurrentTypeGradient();
+    showMessage(`Changed to ${window.POLLUTANT_TYPES[event.target.value].name}`, 1500);
+});
 
 // Initialize on window load
 window.onload = () => {

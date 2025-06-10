@@ -131,45 +131,50 @@ function getInterpolatedDensity(grid, r, c) {
 
 // Helper function for simulation
 function moveAndDiffuse(r, c, amount, windVelX, windVelY, viscosity, diffusionRate, diffusionModifier) {
-    // Calculate new position based on wind and viscosity
-    const newR = r + windVelY * (1 / viscosity);
-    const newC = c + windVelX * (1 / viscosity);
+    // Scale wind velocity by viscosity
+    const effectiveVelX = windVelX / Math.max(0.1, viscosity);
+    const effectiveVelY = windVelY / Math.max(0.1, viscosity);
     
-    // Boundary check
-    if (newR >= 0 && newR < GRID_SIZE - 1 && newC >= 0 && newC < GRID_SIZE - 1) {
-        // Bilinear interpolation for smooth movement
-        const r0 = Math.floor(newR);
-        const c0 = Math.floor(newC);
-        const r1 = r0 + 1;
-        const c1 = c0 + 1;
-        
-        const fr = newR - r0;
-        const fc = newC - c0;
-        
-        // Movement distribution
-        const movementAmount = amount * 0.8; // 80% moves, 20% stays for stability
-        newPollutantGrid[r0][c0] += movementAmount * (1 - fr) * (1 - fc);
-        newPollutantGrid[r0][c1] += movementAmount * (1 - fr) * fc;
-        newPollutantGrid[r1][c0] += movementAmount * fr * (1 - fc);
-        newPollutantGrid[r1][c1] += movementAmount * fr * fc;
-        
-        // The rest stays in current position
-        newPollutantGrid[r][c] += amount * 0.2;
-    } else {
-        // If outside bounds, keep in current position
-        newPollutantGrid[r][c] += amount;
-    }
+    // Calculate new position based on effective velocity
+    const newR = r + effectiveVelY;
+    const newC = c + effectiveVelX;
     
-    // Apply diffusion
+    // Improved boundary check with wrapping
+    const r0 = Math.floor(newR);
+    const c0 = Math.floor(newC);
+    const r1 = (r0 + 1) % GRID_SIZE;
+    const c1 = (c0 + 1) % GRID_SIZE;
+    
+    // Handle negative coordinates
+    const rLow = r0 < 0 ? GRID_SIZE - 1 : r0;
+    const cLow = c0 < 0 ? GRID_SIZE - 1 : c0;
+    const rHigh = r1 < 0 ? GRID_SIZE - 1 : r1;
+    const cHigh = c1 < 0 ? GRID_SIZE - 1 : c1;
+    
+    const fr = newR - Math.floor(newR);
+    const fc = newC - Math.floor(newC);
+    
+    // Movement distribution with improved interpolation
+    const movementAmount = amount * 0.9; // 90% moves with wind
+    const stayAmount = amount * 0.1; // 10% stays for stability
+    
+    // Bilinear interpolation for smooth movement
+    newPollutantGrid[rLow][cLow] += movementAmount * (1 - fr) * (1 - fc);
+    newPollutantGrid[rLow][cHigh] += movementAmount * (1 - fr) * fc;
+    newPollutantGrid[rHigh][cLow] += movementAmount * fr * (1 - fc);
+    newPollutantGrid[rHigh][cHigh] += movementAmount * fr * fc;
+    
+    // The rest stays in the current position
+    newPollutantGrid[r][c] += stayAmount;
+    
+    // Apply diffusion with type-specific modifier
     const effectiveDiffusion = diffusionRate * diffusionModifier * 0.25;
     const neighbors = [[-1, 0], [1, 0], [0, -1], [0, 1]];
     
     for (const [dr, dc] of neighbors) {
-        const nr = r + dr;
-        const nc = c + dc;
-        if (nr >= 0 && nr < GRID_SIZE && nc >= 0 && nc < GRID_SIZE) {
-            newPollutantGrid[nr][nc] += amount * effectiveDiffusion;
-        }
+        const nr = (r + dr + GRID_SIZE) % GRID_SIZE;
+        const nc = (c + dc + GRID_SIZE) % GRID_SIZE;
+        newPollutantGrid[nr][nc] += amount * effectiveDiffusion;
     }
 }
 
