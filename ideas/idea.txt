@@ -1,0 +1,162 @@
+Product Requirements Document: Pollution Dispersion Simulator
+1. Introduction
+This document outlines the requirements and design for a basic 2D fluid simulation application focused on predicting the dispersion of pollutants. The primary goal is to provide an intuitive and interactive tool for understanding how fluid dynamics (like wind or water currents) influence the spread of a harmful substance in a simplified environment. This initial version will focus on core mechanics, laying a foundation for more complex features in the future.
+
+2. Project Goals & Objectives
+2.1 Problem Statement
+Understanding how pollutants disperse in air or water is crucial for environmental management, emergency response, and urban planning. Physical experiments can be costly and time-consuming, while complex numerical models can be daunting for initial comprehension. There is a need for a simplified, visual tool to grasp the fundamental principles.
+
+2.2 Project Goal
+To create a web-based, interactive 2D fluid simulation that visually demonstrates the advection and diffusion of a pollutant from a source, influenced by a user-defined fluid flow.
+
+2.3 Key Objectives
+Visualize Fluid Flow: Represent a basic, uniform fluid flow (e.g., wind direction and speed).
+
+Simulate Pollutant Dispersion: Implement advection (movement with fluid) and diffusion (spreading outwards) of a pollutant.
+
+User Interactivity: Allow users to define the pollution source location, adjust fluid flow parameters, and control simulation speed.
+
+Clear Visualization: Use color gradients or heatmaps to effectively display pollutant concentration.
+
+Educational Tool: Serve as a basic educational aid for environmental science and fluid dynamics principles.
+
+3. Key Features & Functionalities
+3.1 Core Simulation Functionalities
+2D Grid System: The simulation will operate on a discrete 2D grid representing the environment.
+
+Pollutant Density: Each grid cell will store a numerical value representing the pollutant concentration.
+
+Fluid Velocity Field: A simple, uniform velocity vector will represent the overall fluid flow across the grid.
+
+Advection: Pollutant will be moved across cells based on the fluid velocity.
+
+Diffusion: Pollutant will spread to adjacent cells over time, simulating natural spreading.
+
+Pollutant Source: Users can add a continuous or instantaneous release of pollutant at a specific point.
+
+Decay/Attenuation (Optional for V1): A slight reduction in pollutant concentration over time, simulating natural degradation or dispersal to boundaries.
+
+3.2 User Interface (UI) Features
+Simulation Canvas: A central <canvas> element to display the 2D simulation visually.
+
+Control Panel: A side or bottom panel containing interactive elements.
+
+Start/Pause/Reset Buttons: Standard controls for simulation flow.
+
+Pollutant Source Placement: A button or click-event to designate a source location on the canvas.
+
+Fluid Flow Controls: Sliders or input fields for Wind Direction (angle) and Wind Speed (magnitude).
+
+Diffusion Rate Slider: To adjust how quickly the pollutant spreads naturally.
+
+Pollution Release Rate/Intensity Slider: To control how much pollutant is introduced at the source.
+
+Color Legend: A visual guide to interpret pollutant concentration levels.
+
+3.3 Interactivity
+Dynamic Parameter Changes: All control panel parameters should update the simulation in real-time or upon a button press.
+
+Click-to-Place Source: Users can click on the canvas to set or move the pollution source.
+
+Responsive Design: The interface should adapt to different screen sizes (mobile, tablet, desktop).
+
+4. Technical Design & Architecture
+4.1 Architecture
+Client-Side Web Application: The entire application will run in the user's web browser.
+
+Single Page Application (SPA): All components loaded on initial page load.
+
+4.2 Core Technologies
+HTML5: Structure of the web page.
+
+CSS (Tailwind CSS): Styling and responsive layout.
+
+JavaScript: Core simulation logic, UI interaction, and canvas rendering.
+
+HTML Canvas API: For drawing the 2D simulation graphics.
+
+4.3 Simulation Algorithm (Simplified Grid-Based)
+Data Structures:
+
+pollutantGrid[rows][cols]: 2D array storing pollutant concentration values.
+
+newPollutantGrid[rows][cols]: A temporary 2D array for calculations to avoid reading values already updated in the current step.
+
+windX, windY: Global variables for uniform wind direction and speed.
+
+Simulation Loop (executed per frame):
+
+Add Pollutant: At the designated source, add a fixed amount of pollutant to pollutantGrid.
+
+Advection (Simplified): For each cell (r, c), calculate the source cell (prev_r, prev_c) from which pollutant would arrive based on windX and windY. Interpolate pollutant from pollutantGrid at (prev_r, prev_c) and add to newPollutantGrid at (r, c).
+
+Diffusion (Simplified): For each cell (r, c), distribute a small percentage of its pollutant to its immediate neighbors (up, down, left, right) and keep the remainder. This is typically done iteratively.
+
+Boundary Conditions: Prevent pollutant from escaping the grid (e.g., wrap around, reflect, or simply stop). For simplicity, we can let it diffuse out of bounds and effectively "disappear."
+
+Update: Copy newPollutantGrid to pollutantGrid for the next frame.
+
+Render: Draw pollutantGrid values onto the canvas as colored rectangles.
+
+5. Phased Development Plan
+Phase 1: Core Functionality (Current Scope)
+Basic HTML/CSS structure.
+
+Canvas setup and drawing grid cells.
+
+Implementation of a static pollution source.
+
+Basic advection based on uniform wind.
+
+Basic diffusion logic.
+
+Simple color mapping for pollutant concentration.
+
+Start/Pause/Reset buttons.
+
+Sliders for wind speed/direction and diffusion rate.
+
+Phase 2: Enhancements & Refinements
+Improved advection and diffusion algorithms for smoother simulation.
+
+Visualization of wind vectors on the canvas (e.g., small arrows).
+
+Multiple pollution sources.
+
+Clearer visual feedback for controls.
+
+Performance optimizations.
+
+Phase 3: Advanced Features (Future Improvements)
+Non-uniform fluid flow (e.g., obstacles, turbulence).
+
+3D simulation (significant undertaking).
+
+Time-dependent pollution release profiles.
+
+Integration with real-world map data.
+
+Multi-layered simulations (e.g., different pollutant types).
+
+Data logging and analysis features (e.g., time to reach a certain concentration at a point).
+
+Firestore integration to save and load simulation scenarios.
+
+6. Future Enhancements
+As outlined in Phase 3, potential future improvements include:
+
+Complex Terrain/Obstacles: Allow users to draw or define static obstacles that influence fluid flow and pollutant dispersion.
+
+Dynamic Fluid Sources: Introduce more complex fluid dynamics, such as pumps or drains.
+
+Reactive Pollutants: Simulate chemical reactions between pollutants or with the environment.
+
+Particle-based Simulation: Instead of a grid, simulate individual pollutant particles for potentially more realistic visuals, especially for turbulent flows.
+
+Data Visualization: Add charts or graphs to show pollutant concentration over time at specific points.
+
+Saving/Loading: Implement local storage or a database (like Firestore, as suggested in the initial instructions) to save and load simulation states.
+
+User Authentication: For collaborative scenario building or personalized settings.
+
+Accessibility Features: Ensure the simulation is usable by individuals with diverse needs.
