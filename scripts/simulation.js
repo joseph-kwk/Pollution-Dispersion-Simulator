@@ -71,10 +71,69 @@ let pollutionSource = {
     type: 'CHEMICAL' // Default pollution type
 };
 
+// GPU acceleration
+let gpuEngine = null;
+let useGPUAcceleration = false;
+let simulationWorker = null;
+
+// Performance monitoring
+let frameCount = 0;
+let lastTime = performance.now();
+let currentFPS = 0;
+
 // Initialize grids
 function initializeGrid() {
     pollutantGrid = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0));
     newPollutantGrid = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0));
+}
+
+// Initialize GPU acceleration
+function initializeGPU(canvas) {
+    try {
+        // Try the more compatible WebGL2 approach first
+        if (typeof WebGLSimulationEngine !== 'undefined') {
+            gpuEngine = new WebGLSimulationEngine(canvas, GRID_SIZE);
+            simulationWorker = new SimulationWorker();
+            useGPUAcceleration = true;
+            console.log('WebGL GPU acceleration enabled');
+            
+            // Add GPU status indicator
+            const statusElement = document.getElementById('gpuStatus');
+            if (statusElement) {
+                statusElement.textContent = 'GPU: WebGL2 Enabled';
+                statusElement.className = 'text-green-600 font-medium';
+            }
+            
+            return true;
+        }
+        
+        // Fallback to compute shader approach if available
+        if (typeof GPUSimulationEngine !== 'undefined') {
+            gpuEngine = new GPUSimulationEngine(canvas, GRID_SIZE);
+            simulationWorker = new SimulationWorker();
+            useGPUAcceleration = true;
+            console.log('Compute shader GPU acceleration enabled');
+            
+            const statusElement = document.getElementById('gpuStatus');
+            if (statusElement) {
+                statusElement.textContent = 'GPU: Compute Enabled';
+                statusElement.className = 'text-green-600 font-medium';
+            }
+            
+            return true;
+        }
+    } catch (error) {
+        console.warn('GPU acceleration not available:', error.message);
+        useGPUAcceleration = false;
+        
+        // Add GPU status indicator
+        const statusElement = document.getElementById('gpuStatus');
+        if (statusElement) {
+            statusElement.textContent = 'GPU: Disabled (CPU fallback)';
+            statusElement.className = 'text-orange-600 font-medium';
+        }
+    }
+    return false;
 }
 
 // Color mapping function
@@ -187,6 +246,66 @@ function simulateStep() {
     const diffusionRate = window.diffusionRate || 0.1;
     const pollutantType = POLLUTANT_TYPES[pollutionSource.type];
     
+    if (useGPUAcceleration && gpuEngine) {
+        simulateStepGPU(windVelX, windVelY, diffusionRate, pollutantType);
+    } else {
+        simulateStepCPU(windVelX, windVelY, diffusionRate, pollutantType);
+    }
+}
+
+// GPU-accelerated simulation step
+function simulateStepGPU(windVelX, windVelY, diffusionRate, pollutantType) {
+    try {
+        // Convert grid to GPU textures and run compute shaders
+        const deltaTime = 1.0 / 60.0; // Assuming 60 FPS
+        
+        // Update pollution source in CPU grid first
+        if (pollutionSource && pollutionSource.x >= 0 && pollutionSource.y >= 0 &&
+            pollutionSource.x < GRID_SIZE && pollutionSource.y < GRID_SIZE) {
+            pollutantGrid[pollutionSource.y][pollutionSource.x] += window.releaseRate || 10;
+        }
+        
+        // Set uniforms for GPU computation
+        const uniforms = {
+            u_deltaTime: deltaTime,
+            u_gridSpacing: 1.0,
+            u_gridSize: [GRID_SIZE, GRID_SIZE],
+            u_windVelocity: [windVelX, windVelY],
+            u_diffusionRate: diffusionRate * pollutantType.diffusionModifier,
+            u_pollutantProperties: [
+                pollutantType.diffusionModifier,
+                pollutantType.behavior.reactivity || 0.1,
+                pollutantType.behavior.sinkRate || 0.0,
+                pollutantType.behavior.volatility || 0.0
+            ],
+            u_viscosity: pollutantType.behavior.viscosity || 1.0,
+            u_sourcePosition: [pollutionSource.x, pollutionSource.y],
+            u_sourceStrength: (window.releaseRate || 10) / 255.0,
+            u_sourceRadius: 2.0
+        };
+        
+        // Run GPU simulation step
+        gpuEngine.simulateFrame(pollutantGrid, uniforms);
+        
+        // Optional: Use web worker for additional background processing
+        if (simulationWorker && Math.random() < 0.1) { // Every ~10 frames
+            simulationWorker.computeInBackground('ANALYZE_DISPERSION', {
+                grid: pollutantGrid,
+                source: pollutionSource,
+                type: pollutantType
+            });
+        }
+        
+    } catch (error) {
+        console.warn('GPU simulation failed, falling back to CPU:', error);
+        useGPUAcceleration = false;
+        updatePerformanceDisplay(); // Update display to show CPU mode
+        simulateStepCPU(windVelX, windVelY, diffusionRate, pollutantType);
+    }
+}
+
+// CPU fallback simulation step
+function simulateStepCPU(windVelX, windVelY, diffusionRate, pollutantType) {
     // Reset new grid
     for (let r = 0; r < GRID_SIZE; r++) {
         for (let c = 0; c < GRID_SIZE; c++) {
@@ -229,20 +348,91 @@ function simulateStep() {
 // Animation loop
 function animate() {
     if (!isRunning) return;
+    
+    // Performance monitoring
+    frameCount++;
+    const currentTime = performance.now();
+    if (currentTime - lastTime >= 1000) { // Update FPS every second
+        currentFPS = Math.round((frameCount * 1000) / (currentTime - lastTime));
+        updatePerformanceDisplay();
+        frameCount = 0;
+        lastTime = currentTime;
+    }
+    
     simulateStep();
     window.draw();
     animationFrameId = requestAnimationFrame(animate);
 }
 
+// Update performance display
+function updatePerformanceDisplay() {
+    const fpsDisplay = document.getElementById('fpsDisplay');
+    const computeModeDisplay = document.getElementById('computeModeDisplay');
+    
+    if (fpsDisplay) {
+        fpsDisplay.textContent = currentFPS;
+        fpsDisplay.className = currentFPS > 30 ? 'text-green-600' : currentFPS > 15 ? 'text-yellow-600' : 'text-red-600';
+    }
+    
+    if (computeModeDisplay) {
+        computeModeDisplay.textContent = useGPUAcceleration ? 'GPU' : 'CPU';
+        computeModeDisplay.className = useGPUAcceleration ? 'text-green-600 font-medium' : 'text-blue-600';
+    }
+}
+
+// Toggle GPU acceleration
+function toggleGPUAcceleration() {
+    useGPUAcceleration = !useGPUAcceleration;
+    
+    // Update GPU toggle UI
+    const toggle = document.getElementById('gpuToggle');
+    if (toggle) {
+        toggle.classList.toggle('active', useGPUAcceleration);
+    }
+    
+    // Update status indicators
+    updatePerformanceDisplay();
+    
+    const statusText = useGPUAcceleration ? 'GPU acceleration enabled' : 'GPU acceleration disabled';
+    if (typeof showMessage === 'function') {
+        showMessage(statusText, 'info', 2000);
+    }
+    
+    console.log(statusText);
+}
+
 // Initialize simulation
 function init() {
     initializeGrid();
+    
+    // Try to initialize GPU acceleration
+    const canvas = document.getElementById('simulationCanvas');
+    if (canvas) {
+        initializeGPU(canvas);
+    }
+    
     window.getColorForDensity = getColorForDensity;
     window.pollutantGrid = pollutantGrid;
     window.pollutionSource = pollutionSource;
     window.isRunning = isRunning;
     window.animate = animate;
     window.POLLUTANT_TYPES = POLLUTANT_TYPES;
+    window.toggleGPUAcceleration = toggleGPUAcceleration;
+}
+
+// Function to toggle GPU acceleration
+function toggleGPUAcceleration() {
+    if (gpuEngine) {
+        useGPUAcceleration = !useGPUAcceleration;
+        const statusElement = document.getElementById('gpuStatus');
+        if (statusElement) {
+            statusElement.textContent = useGPUAcceleration ? 'GPU: Enabled' : 'GPU: Disabled (CPU)';
+            statusElement.className = useGPUAcceleration ? 'text-green-600 font-medium' : 'text-blue-600 font-medium';
+        }
+        console.log('GPU acceleration:', useGPUAcceleration ? 'enabled' : 'disabled');
+        return useGPUAcceleration;
+    }
+    return false;
 }
 
 // Initialize when the script loads

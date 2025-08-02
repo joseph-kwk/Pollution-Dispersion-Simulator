@@ -20,18 +20,33 @@ class GPUSimulationEngine {
     }
     
     initializeWebGL() {
-        // Get WebGL2 context for compute shader support
-        this.gl = this.canvas.getContext('webgl2-compute', { antialias: false }) || 
-                  this.canvas.getContext('webgl2', { antialias: false });
+        // Try WebGL2 first (required for compute shaders in some browsers)
+        this.gl = this.canvas.getContext('webgl2', { 
+            antialias: false,
+            alpha: false,
+            depth: false,
+            stencil: false,
+            preserveDrawingBuffer: false,
+            powerPreference: 'high-performance'
+        });
         
         if (!this.gl) {
-            throw new Error('WebGL2 not supported');
+            throw new Error('WebGL2 not supported - GPU acceleration unavailable');
+        }
+        
+        // Check for compute shader support (not widely supported yet)
+        const computeExt = this.gl.getExtension('EXT_compute_shader') || 
+                          this.gl.getExtension('WEBGL_compute_shader');
+        
+        if (!computeExt) {
+            console.warn('Compute shaders not supported, using transform feedback approach');
+            this.useTransformFeedback = true;
         }
         
         // Check for required extensions
         this.checkExtensions();
         
-        console.log('GPU acceleration initialized');
+        console.log('GPU acceleration initialized with WebGL2');
     }
     
     checkExtensions() {
@@ -377,6 +392,142 @@ class GPUSimulationEngine {
         
         // Continue with diffusion, pressure projection, etc.
         // ... (similar GPU compute dispatches for each step)
+    }
+    
+    // High-level simulation frame method for integration
+    simulateFrame(pollutantGrid, uniforms) {
+        try {
+            // Upload pollutant data to GPU texture
+            this.uploadGridToTexture(pollutantGrid, this.textures.pollutant);
+            
+            // Set wind velocity in velocity texture
+            this.setWindField(uniforms.u_windVelocity);
+            
+            // Run advection step
+            this.runAdvection(uniforms);
+            
+            // Run diffusion step
+            this.runDiffusion(uniforms);
+            
+            // Run pollutant transport
+            this.runPollutantTransport(uniforms);
+            
+            // Download result back to CPU grid
+            this.downloadTextureToGrid(this.textures.pollutant, pollutantGrid);
+            
+        } catch (error) {
+            console.warn('GPU simulation frame failed:', error);
+            throw error;
+        }
+    }
+    
+    // Helper methods for simulateFrame
+    uploadGridToTexture(grid, texture) {
+        const data = new Float32Array(this.gridSize * this.gridSize * 4);
+        for (let y = 0; y < this.gridSize; y++) {
+            for (let x = 0; x < this.gridSize; x++) {
+                const index = (y * this.gridSize + x) * 4;
+                const value = grid[y][x] / 255.0; // Normalize to 0-1
+                data[index] = value;     // R
+                data[index + 1] = 0;     // G
+                data[index + 2] = 0;     // B
+                data[index + 3] = 1;     // A
+            }
+        }
+        
+        this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
+        this.gl.texSubImage2D(
+            this.gl.TEXTURE_2D, 0, 0, 0,
+            this.gridSize, this.gridSize,
+            this.gl.RGBA, this.gl.FLOAT, data
+        );
+    }
+    
+    downloadTextureToGrid(texture, grid) {
+        // Create framebuffer to read from texture
+        const fb = this.gl.createFramebuffer();
+        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, fb);
+        this.gl.framebufferTexture2D(
+            this.gl.FRAMEBUFFER,
+            this.gl.COLOR_ATTACHMENT0,
+            this.gl.TEXTURE_2D,
+            texture, 0
+        );
+        
+        const data = new Float32Array(this.gridSize * this.gridSize * 4);
+        this.gl.readPixels(
+            0, 0, this.gridSize, this.gridSize,
+            this.gl.RGBA, this.gl.FLOAT, data
+        );
+        
+        // Convert back to grid
+        for (let y = 0; y < this.gridSize; y++) {
+            for (let x = 0; x < this.gridSize; x++) {
+                const index = (y * this.gridSize + x) * 4;
+                grid[y][x] = data[index] * 255.0; // Denormalize
+            }
+        }
+        
+        this.gl.deleteFramebuffer(fb);
+    }
+    
+    setWindField(windVelocity) {
+        // Set uniform wind field in velocity texture
+        const data = new Float32Array(this.gridSize * this.gridSize * 4);
+        for (let i = 0; i < this.gridSize * this.gridSize; i++) {
+            const index = i * 4;
+            data[index] = windVelocity[0];     // u component
+            data[index + 1] = windVelocity[1]; // v component
+            data[index + 2] = 0;               // w component (unused)
+            data[index + 3] = 0;               // pressure
+        }
+        
+        this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.velocity);
+        this.gl.texSubImage2D(
+            this.gl.TEXTURE_2D, 0, 0, 0,
+            this.gridSize, this.gridSize,
+            this.gl.RGBA, this.gl.FLOAT, data
+        );
+    }
+    
+    runAdvection(uniforms) {
+        this.gl.useProgram(this.computePrograms.advection);
+        this.setUniforms(this.computePrograms.advection, uniforms);
+        
+        this.bindImageTexture(this.textures.velocity, 0, this.gl.READ_ONLY);
+        this.bindImageTexture(this.textures.velocityTemp, 1, this.gl.WRITE_ONLY);
+        
+        this.dispatch(Math.ceil(this.gridSize / 16), Math.ceil(this.gridSize / 16), 1);
+        this.gl.memoryBarrier(this.gl.SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    }
+    
+    runDiffusion(uniforms) {
+        this.gl.useProgram(this.computePrograms.diffusion);
+        this.setUniforms(this.computePrograms.diffusion, uniforms);
+        
+        this.bindImageTexture(this.textures.pollutant, 0, this.gl.READ_ONLY);
+        this.bindImageTexture(this.textures.pollutantTemp, 1, this.gl.WRITE_ONLY);
+        
+        this.dispatch(Math.ceil(this.gridSize / 16), Math.ceil(this.gridSize / 16), 1);
+        this.gl.memoryBarrier(this.gl.SHADER_IMAGE_ACCESS_BARRIER_BIT);
+        
+        // Swap textures
+        [this.textures.pollutant, this.textures.pollutantTemp] = [this.textures.pollutantTemp, this.textures.pollutant];
+    }
+    
+    runPollutantTransport(uniforms) {
+        this.gl.useProgram(this.computePrograms.pollutant);
+        this.setUniforms(this.computePrograms.pollutant, uniforms);
+        
+        this.bindImageTexture(this.textures.pollutant, 0, this.gl.READ_ONLY);
+        this.bindImageTexture(this.textures.velocity, 1, this.gl.READ_ONLY);
+        this.bindImageTexture(this.textures.pollutantTemp, 2, this.gl.WRITE_ONLY);
+        
+        this.dispatch(Math.ceil(this.gridSize / 16), Math.ceil(this.gridSize / 16), 1);
+        this.gl.memoryBarrier(this.gl.SHADER_IMAGE_ACCESS_BARRIER_BIT);
+        
+        // Swap textures
+        [this.textures.pollutant, this.textures.pollutantTemp] = [this.textures.pollutantTemp, this.textures.pollutant];
     }
     
     // Performance monitoring
