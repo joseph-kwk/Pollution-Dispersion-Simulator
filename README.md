@@ -41,6 +41,16 @@ This project uses:
 - Tailwind CSS for styling
 - Vanilla JavaScript for simulation logic
 
+### Environment variables (optional, for live data)
+
+Create a .env file (see .env.example) to enable weather/satellite/water APIs when using the advanced modules:
+
+- VITE_OPENWEATHER_API_KEY
+- VITE_SATELLITE_API_KEY
+- VITE_WATER_QUALITY_API_KEY
+
+Note: Keys are exposed to the browser in dev builds; for production, proxy sensitive APIs server-side.
+
 ## Future Enhancements
 
 - Multiple pollution sources

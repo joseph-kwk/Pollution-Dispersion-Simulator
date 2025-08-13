@@ -63,6 +63,8 @@ const POLLUTANT_TYPES = {
 // Simulation state
 let pollutantGrid = [];
 let newPollutantGrid = [];
+let obstacleMask = [];
+let obstaclesDirty = false;
 let isRunning = false;
 let animationFrameId = null;
 let pollutionSource = { 
@@ -80,11 +82,15 @@ let simulationWorker = null;
 let frameCount = 0;
 let lastTime = performance.now();
 let currentFPS = 0;
+let gpuFrameTick = 0; // For throttling GPU readbacks
+const GPU_READBACK_INTERVAL = 2; // Read back every N frames (tune: 1-4)
 
 // Initialize grids
 function initializeGrid() {
     pollutantGrid = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0));
     newPollutantGrid = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0));
+    obstacleMask = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0));
+    obstaclesDirty = true;
 }
 
 // Initialize GPU acceleration
@@ -95,6 +101,7 @@ function initializeGPU(canvas) {
             gpuEngine = new WebGLSimulationEngine(canvas, GRID_SIZE);
             simulationWorker = new SimulationWorker();
             useGPUAcceleration = true;
+            window.gpuEngine = gpuEngine;
             console.log('WebGL GPU acceleration enabled');
             
             // Add GPU status indicator
@@ -112,6 +119,7 @@ function initializeGPU(canvas) {
             gpuEngine = new GPUSimulationEngine(canvas, GRID_SIZE);
             simulationWorker = new SimulationWorker();
             useGPUAcceleration = true;
+            window.gpuEngine = gpuEngine;
             console.log('Compute shader GPU acceleration enabled');
             
             const statusElement = document.getElementById('gpuStatus');
@@ -198,17 +206,14 @@ function moveAndDiffuse(r, c, amount, windVelX, windVelY, viscosity, diffusionRa
     const newR = r + effectiveVelY;
     const newC = c + effectiveVelX;
     
-    // Improved boundary check with wrapping
-    const r0 = Math.floor(newR);
-    const c0 = Math.floor(newC);
-    const r1 = (r0 + 1) % GRID_SIZE;
-    const c1 = (c0 + 1) % GRID_SIZE;
-    
-    // Handle negative coordinates
-    const rLow = r0 < 0 ? GRID_SIZE - 1 : r0;
-    const cLow = c0 < 0 ? GRID_SIZE - 1 : c0;
-    const rHigh = r1 < 0 ? GRID_SIZE - 1 : r1;
-    const cHigh = c1 < 0 ? GRID_SIZE - 1 : c1;
+    // No-flux boundaries: clamp movement at edges and obstacles
+    const r0 = Math.max(0, Math.min(GRID_SIZE - 1, Math.floor(newR)));
+    const c0 = Math.max(0, Math.min(GRID_SIZE - 1, Math.floor(newC)));
+    const r1 = Math.max(0, Math.min(GRID_SIZE - 1, r0 + 1));
+    const c1 = Math.max(0, Math.min(GRID_SIZE - 1, c0 + 1));
+
+    // If destination cells are obstacles, reduce movement into them
+    const isObst = (rr, cc) => obstacleMask[rr]?.[cc] === 1;
     
     const fr = newR - Math.floor(newR);
     const fc = newC - Math.floor(newC);
@@ -218,10 +223,21 @@ function moveAndDiffuse(r, c, amount, windVelX, windVelY, viscosity, diffusionRa
     const stayAmount = amount * 0.1; // 10% stays for stability
     
     // Bilinear interpolation for smooth movement
-    newPollutantGrid[rLow][cLow] += movementAmount * (1 - fr) * (1 - fc);
-    newPollutantGrid[rLow][cHigh] += movementAmount * (1 - fr) * fc;
-    newPollutantGrid[rHigh][cLow] += movementAmount * fr * (1 - fc);
-    newPollutantGrid[rHigh][cHigh] += movementAmount * fr * fc;
+    const w00 = (1 - fr) * (1 - fc);
+    const w01 = (1 - fr) * fc;
+    const w10 = fr * (1 - fc);
+    const w11 = fr * fc;
+    const scaleInto = (rr, cc, w) => (isObst(rr, cc) ? 0 : w);
+    const w00s = scaleInto(r0, c0, w00);
+    const w01s = scaleInto(r0, c1, w01);
+    const w10s = scaleInto(r1, c0, w10);
+    const w11s = scaleInto(r1, c1, w11);
+
+    const moved = movementAmount * (w00s + w01s + w10s + w11s);
+    newPollutantGrid[r0][c0] += movementAmount * w00s;
+    newPollutantGrid[r0][c1] += movementAmount * w01s;
+    newPollutantGrid[r1][c0] += movementAmount * w10s;
+    newPollutantGrid[r1][c1] += movementAmount * w11s;
     
     // The rest stays in the current position
     newPollutantGrid[r][c] += stayAmount;
@@ -231,9 +247,14 @@ function moveAndDiffuse(r, c, amount, windVelX, windVelY, viscosity, diffusionRa
     const neighbors = [[-1, 0], [1, 0], [0, -1], [0, 1]];
     
     for (const [dr, dc] of neighbors) {
-        const nr = (r + dr + GRID_SIZE) % GRID_SIZE;
-        const nc = (c + dc + GRID_SIZE) % GRID_SIZE;
-        newPollutantGrid[nr][nc] += amount * effectiveDiffusion;
+        const nr = r + dr;
+        const nc = c + dc;
+        if (nr >= 0 && nr < GRID_SIZE && nc >= 0 && nc < GRID_SIZE && !isObst(nr, nc)) {
+            newPollutantGrid[nr][nc] += amount * effectiveDiffusion;
+        } else {
+            // reflect diffusion back into current cell on obstacle/edge
+            newPollutantGrid[r][c] += amount * effectiveDiffusion;
+        }
     }
 }
 
@@ -284,8 +305,10 @@ function simulateStepGPU(windVelX, windVelY, diffusionRate, pollutantType) {
             u_sourceRadius: 2.0
         };
         
-        // Run GPU simulation step
-        gpuEngine.simulateFrame(pollutantGrid, uniforms);
+    // Run GPU simulation step with throttled readback to reduce CPU-GPU transfers
+    const shouldReadback = (gpuFrameTick % GPU_READBACK_INTERVAL) === 0;
+    gpuEngine.simulateFrame(pollutantGrid, uniforms, { readback: shouldReadback });
+    gpuFrameTick = (gpuFrameTick + 1) >>> 0;
         
         // Optional: Use web worker for additional background processing
         if (simulationWorker && Math.random() < 0.1) { // Every ~10 frames
@@ -418,6 +441,8 @@ function init() {
     window.animate = animate;
     window.POLLUTANT_TYPES = POLLUTANT_TYPES;
     window.toggleGPUAcceleration = toggleGPUAcceleration;
+    window.obstacleMask = obstacleMask;
+    window.obstaclesDirty = obstaclesDirty;
 }
 
 // Function to toggle GPU acceleration

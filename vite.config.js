@@ -42,7 +42,12 @@ export default defineConfig({
     include: ['gl-matrix', 'd3', 'three']
   },
   define: {
-    __VERSION__: JSON.stringify(process.env.npm_package_version)
+    __VERSION__: JSON.stringify(process.env.npm_package_version),
+    'window.__ENV__': {
+      VITE_OPENWEATHER_API_KEY: JSON.stringify(process.env.VITE_OPENWEATHER_API_KEY || ''),
+      VITE_SATELLITE_API_KEY: JSON.stringify(process.env.VITE_SATELLITE_API_KEY || ''),
+      VITE_WATER_QUALITY_API_KEY: JSON.stringify(process.env.VITE_WATER_QUALITY_API_KEY || '')
+    }
   },
   plugins: []
 });

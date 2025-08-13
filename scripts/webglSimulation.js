@@ -51,111 +51,113 @@ class WebGLSimulationEngine {
         const vertexShader = `#version 300 es
             in vec2 a_position;
             out vec2 v_texCoord;
-            
             void main() {
                 v_texCoord = a_position * 0.5 + 0.5;
                 gl_Position = vec4(a_position, 0.0, 1.0);
             }
         `;
-        
-        // Advection fragment shader
+
+        // Advection fragment shader (obstacle-aware)
         const advectionFragment = `#version 300 es
             precision highp float;
-            
             uniform sampler2D u_pollutantTexture;
             uniform sampler2D u_velocityTexture;
+            uniform sampler2D u_obstacleTexture;
             uniform float u_deltaTime;
             uniform vec2 u_gridSize;
             uniform vec2 u_texelSize;
-            
             in vec2 v_texCoord;
             out vec4 fragColor;
-            
-            vec4 bilinearSample(sampler2D tex, vec2 coord) {
-                return texture(tex, coord);
-            }
-            
+            vec4 bilinearSample(sampler2D tex, vec2 coord) { return texture(tex, coord); }
             void main() {
+                float obstHere = texture(u_obstacleTexture, v_texCoord).r;
+                if (obstHere > 0.5) { fragColor = vec4(0.0); return; }
                 vec2 velocity = texture(u_velocityTexture, v_texCoord).xy;
-                
-                // Semi-Lagrangian advection
                 vec2 prevPos = v_texCoord - velocity * u_deltaTime * u_texelSize;
-                
-                // Clamp to texture boundaries
                 prevPos = clamp(prevPos, u_texelSize * 0.5, vec2(1.0) - u_texelSize * 0.5);
-                
-                // Sample pollutant at previous position
-                vec4 pollutant = bilinearSample(u_pollutantTexture, prevPos);
-                
+                float obstPrev = texture(u_obstacleTexture, prevPos).r;
+                vec4 pollutant = (obstPrev > 0.5)
+                    ? bilinearSample(u_pollutantTexture, v_texCoord)
+                    : bilinearSample(u_pollutantTexture, prevPos);
                 fragColor = pollutant;
             }
         `;
-        
-        // Diffusion fragment shader
+
+        // Diffusion fragment shader (obstacle-aware, reflective boundaries)
         const diffusionFragment = `#version 300 es
             precision highp float;
-            
             uniform sampler2D u_pollutantTexture;
+            uniform sampler2D u_obstacleTexture;
             uniform float u_diffusionRate;
             uniform float u_deltaTime;
             uniform vec2 u_texelSize;
-            
             in vec2 v_texCoord;
             out vec4 fragColor;
-            
             void main() {
+                float obstHere = texture(u_obstacleTexture, v_texCoord).r;
+                if (obstHere > 0.5) { fragColor = vec4(0.0); return; }
                 vec4 center = texture(u_pollutantTexture, v_texCoord);
                 vec4 left = texture(u_pollutantTexture, v_texCoord + vec2(-u_texelSize.x, 0.0));
                 vec4 right = texture(u_pollutantTexture, v_texCoord + vec2(u_texelSize.x, 0.0));
                 vec4 bottom = texture(u_pollutantTexture, v_texCoord + vec2(0.0, -u_texelSize.y));
                 vec4 top = texture(u_pollutantTexture, v_texCoord + vec2(0.0, u_texelSize.y));
-                
-                // Laplacian operator for diffusion
+                float obstL = texture(u_obstacleTexture, v_texCoord + vec2(-u_texelSize.x, 0.0)).r;
+                float obstR = texture(u_obstacleTexture, v_texCoord + vec2(u_texelSize.x, 0.0)).r;
+                float obstB = texture(u_obstacleTexture, v_texCoord + vec2(0.0, -u_texelSize.y)).r;
+                float obstT = texture(u_obstacleTexture, v_texCoord + vec2(0.0, u_texelSize.y)).r;
+                if (obstL > 0.5) left = center;
+                if (obstR > 0.5) right = center;
+                if (obstB > 0.5) bottom = center;
+                if (obstT > 0.5) top = center;
                 vec4 laplacian = (left + right + bottom + top - 4.0 * center);
-                
-                // Apply diffusion
                 vec4 result = center + u_diffusionRate * u_deltaTime * laplacian;
-                
-                // Clamp to valid range
                 fragColor = max(vec4(0.0), result);
             }
         `;
-        
-        // Source injection fragment shader
+
+        // Source injection fragment shader (skip obstacles)
         const sourceFragment = `#version 300 es
             precision highp float;
-            
             uniform sampler2D u_pollutantTexture;
+            uniform sampler2D u_obstacleTexture;
             uniform vec2 u_sourcePosition;
             uniform float u_sourceStrength;
             uniform float u_sourceRadius;
             uniform vec2 u_gridSize;
-            
             in vec2 v_texCoord;
             out vec4 fragColor;
-            
             void main() {
                 vec4 pollutant = texture(u_pollutantTexture, v_texCoord);
-                
-                // Convert to grid coordinates
                 vec2 gridPos = v_texCoord * u_gridSize;
-                
-                // Calculate distance from source
                 float dist = distance(gridPos, u_sourcePosition);
-                
-                // Add pollutant if within source radius
                 if (dist <= u_sourceRadius) {
                     float falloff = 1.0 - (dist / u_sourceRadius);
-                    pollutant.r += u_sourceStrength * falloff;
+                    float obst = texture(u_obstacleTexture, v_texCoord).r;
+                    if (obst < 0.5) { pollutant.r += u_sourceStrength * falloff; }
                 }
-                
                 fragColor = pollutant;
             }
         `;
-        
+
         this.programs.advection = this.createProgram(vertexShader, advectionFragment);
         this.programs.diffusion = this.createProgram(vertexShader, diffusionFragment);
         this.programs.source = this.createProgram(vertexShader, sourceFragment);
+
+        // Display shader to render pollutant texture to the canvas
+        const displayFragment = `#version 300 es
+            precision highp float;
+            uniform sampler2D u_pollutantTexture;
+            uniform vec3 u_pollutantColor;
+            uniform vec3 u_baseColor;
+            in vec2 v_texCoord;
+            out vec4 fragColor;
+            void main() {
+                float conc = texture(u_pollutantTexture, v_texCoord).r;
+                vec3 color = mix(u_baseColor, u_pollutantColor, clamp(conc, 0.0, 1.0));
+                fragColor = vec4(color, 1.0);
+            }
+        `;
+        this.programs.display = this.createProgram(vertexShader, displayFragment);
     }
     
     createProgram(vertexSource, fragmentSource) {
@@ -190,6 +192,8 @@ class WebGLSimulationEngine {
         this.textures.pollutant = this.createTexture();
         this.textures.pollutantTemp = this.createTexture();
         this.textures.velocity = this.createTexture();
+    // Obstacle mask texture (8-bit RGBA, nearest sampling)
+    this.textures.obstacles = this.createMaskTexture();
         
         // Create framebuffers for render-to-texture
         this.framebuffers.pollutant = this.createFramebuffer(this.textures.pollutant);
@@ -211,6 +215,21 @@ class WebGLSimulationEngine {
         this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
         this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
         
+        return texture;
+    }
+
+    createMaskTexture() {
+        const texture = this.gl.createTexture();
+        this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
+        this.gl.texImage2D(
+            this.gl.TEXTURE_2D, 0, this.gl.RGBA8,
+            this.gridSize, this.gridSize, 0,
+            this.gl.RGBA, this.gl.UNSIGNED_BYTE, null
+        );
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.NEAREST);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
         return texture;
     }
     
@@ -244,10 +263,17 @@ class WebGLSimulationEngine {
         this.gl.bufferData(this.gl.ARRAY_BUFFER, positions, this.gl.STATIC_DRAW);
     }
     
-    simulateFrame(pollutantGrid, uniforms) {
+    simulateFrame(pollutantGrid, uniforms, options = { readback: true }) {
         try {
             // Upload current pollutant data
             this.uploadGrid(pollutantGrid, this.textures.pollutant);
+            // Upload obstacle mask only when changed (dirty)
+            if (typeof window !== 'undefined' && window.obstacleMask && window.obstacleMask.length === this.gridSize) {
+                if (window.obstaclesDirty) {
+                    this.uploadObstacleMask(window.obstacleMask);
+                    window.obstaclesDirty = false;
+                }
+            }
             
             // Set up velocity field
             this.setupVelocityField(uniforms.u_windVelocity);
@@ -257,13 +283,45 @@ class WebGLSimulationEngine {
             this.runDiffusion(uniforms);
             this.runSourceInjection(uniforms);
             
-            // Download result
-            this.downloadGrid(this.textures.pollutant, pollutantGrid);
+            // Render to canvas
+            this.runDisplay(uniforms);
+
+            // Download result only when requested (reduce GPU->CPU cost)
+            if (options && options.readback) {
+                this.downloadGrid(this.textures.pollutant, pollutantGrid);
+            }
             
         } catch (error) {
             console.error('WebGL simulation frame failed:', error);
             throw error;
         }
+    }
+
+    runDisplay(uniforms) {
+        // Render pollutant texture to default framebuffer (the canvas)
+        const prevFramebuffer = this.gl.getParameter(this.gl.FRAMEBUFFER_BINDING);
+        const prevViewport = this.gl.getParameter(this.gl.VIEWPORT);
+
+        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+        this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+        this.gl.useProgram(this.programs.display);
+
+        // Colors
+        const pollutantColor = uniforms.u_displayPollutantColor || [1.0, 0.3, 0.3];
+        const baseColor = uniforms.u_displayBaseColor || [0.92, 0.96, 1.0];
+        this.gl.uniform3f(this.gl.getUniformLocation(this.programs.display, 'u_pollutantColor'), pollutantColor[0], pollutantColor[1], pollutantColor[2]);
+        this.gl.uniform3f(this.gl.getUniformLocation(this.programs.display, 'u_baseColor'), baseColor[0], baseColor[1], baseColor[2]);
+
+        // Bind pollutant texture for display
+        this.gl.activeTexture(this.gl.TEXTURE0);
+        this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.pollutant);
+        this.gl.uniform1i(this.gl.getUniformLocation(this.programs.display, 'u_pollutantTexture'), 0);
+
+        this.drawQuad(this.programs.display);
+
+        // Restore framebuffer and viewport
+        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, prevFramebuffer);
+        this.gl.viewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
     }
     
     uploadGrid(grid, texture) {
@@ -285,6 +343,26 @@ class WebGLSimulationEngine {
             this.gl.TEXTURE_2D, 0, 0, 0,
             this.gridSize, this.gridSize,
             this.gl.RGBA, this.gl.FLOAT, data
+        );
+    }
+
+    uploadObstacleMask(maskGrid) {
+        const data = new Uint8Array(this.gridSize * this.gridSize * 4);
+        for (let y = 0; y < this.gridSize; y++) {
+            for (let x = 0; x < this.gridSize; x++) {
+                const index = (y * this.gridSize + x) * 4;
+                const v = maskGrid[y][x] ? 255 : 0;
+                data[index] = v;     // R
+                data[index + 1] = 0; // G
+                data[index + 2] = 0; // B
+                data[index + 3] = 255; // A
+            }
+        }
+        this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.obstacles);
+        this.gl.texSubImage2D(
+            this.gl.TEXTURE_2D, 0, 0, 0,
+            this.gridSize, this.gridSize,
+            this.gl.RGBA, this.gl.UNSIGNED_BYTE, data
         );
     }
     
@@ -338,9 +416,12 @@ class WebGLSimulationEngine {
         this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.pollutant);
         this.gl.uniform1i(this.gl.getUniformLocation(this.programs.advection, 'u_pollutantTexture'), 0);
         
-        this.gl.activeTexture(this.gl.TEXTURE1);
+    this.gl.activeTexture(this.gl.TEXTURE1);
         this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.velocity);
         this.gl.uniform1i(this.gl.getUniformLocation(this.programs.advection, 'u_velocityTexture'), 1);
+    this.gl.activeTexture(this.gl.TEXTURE2);
+    this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.obstacles);
+    this.gl.uniform1i(this.gl.getUniformLocation(this.programs.advection, 'u_obstacleTexture'), 2);
         
         this.drawQuad(this.programs.advection);
         
@@ -357,9 +438,12 @@ class WebGLSimulationEngine {
         this.gl.uniform1f(this.gl.getUniformLocation(this.programs.diffusion, 'u_deltaTime'), uniforms.u_deltaTime);
         this.gl.uniform2f(this.gl.getUniformLocation(this.programs.diffusion, 'u_texelSize'), 1.0/this.gridSize, 1.0/this.gridSize);
         
-        this.gl.activeTexture(this.gl.TEXTURE0);
+    this.gl.activeTexture(this.gl.TEXTURE0);
         this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.pollutant);
         this.gl.uniform1i(this.gl.getUniformLocation(this.programs.diffusion, 'u_pollutantTexture'), 0);
+    this.gl.activeTexture(this.gl.TEXTURE1);
+    this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.obstacles);
+    this.gl.uniform1i(this.gl.getUniformLocation(this.programs.diffusion, 'u_obstacleTexture'), 1);
         
         this.drawQuad(this.programs.diffusion);
         
@@ -381,9 +465,12 @@ class WebGLSimulationEngine {
         this.gl.uniform1f(this.gl.getUniformLocation(this.programs.source, 'u_sourceRadius'), uniforms.u_sourceRadius || 2.0);
         this.gl.uniform2f(this.gl.getUniformLocation(this.programs.source, 'u_gridSize'), this.gridSize, this.gridSize);
         
-        this.gl.activeTexture(this.gl.TEXTURE0);
+    this.gl.activeTexture(this.gl.TEXTURE0);
         this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.pollutant);
         this.gl.uniform1i(this.gl.getUniformLocation(this.programs.source, 'u_pollutantTexture'), 0);
+    this.gl.activeTexture(this.gl.TEXTURE1);
+    this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.obstacles);
+    this.gl.uniform1i(this.gl.getUniformLocation(this.programs.source, 'u_obstacleTexture'), 1);
         
         this.drawQuad(this.programs.source);
         

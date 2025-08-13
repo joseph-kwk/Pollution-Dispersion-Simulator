@@ -5,10 +5,12 @@
 
 class RealWorldDataManager {
     constructor() {
+        // Use window.__ENV__ if provided by hosting/bundler; fallback to placeholders
+        const env = (typeof window !== 'undefined' && window.__ENV__) || {};
         this.apiKeys = {
-            weather: process.env.OPENWEATHER_API_KEY || 'your_api_key_here',
-            satellite: process.env.SATELLITE_API_KEY || 'your_api_key_here',
-            water: process.env.WATER_QUALITY_API_KEY || 'your_api_key_here'
+            weather: env.VITE_OPENWEATHER_API_KEY || 'your_api_key_here',
+            satellite: env.VITE_SATELLITE_API_KEY || 'your_api_key_here',
+            water: env.VITE_WATER_QUALITY_API_KEY || 'your_api_key_here'
         };
         
         this.dataSources = {
@@ -52,6 +54,9 @@ class RealWorldDataManager {
         const url = `${this.dataSources.weather}?lat=${this.location.latitude}&lon=${this.location.longitude}&appid=${this.apiKeys.weather}&units=metric`;
         
         try {
+            if (!this.apiKeys.weather || this.apiKeys.weather === 'your_api_key_here') {
+                console.warn('OpenWeather API key missing. Set VITE_OPENWEATHER_API_KEY in a .env file for live data. Using defaults.');
+            }
             const response = await fetch(url);
             const data = await response.json();
             
@@ -151,7 +156,7 @@ class RealWorldDataManager {
     
     // Satellite imagery for visual reference
     async loadSatelliteImagery() {
-        const url = `${this.dataSources.satellite}?lon=${this.location.longitude}&lat=${this.location.latitude}&date=2024-01-01&dim=0.5&api_key=${this.apiKeys.satellite}`;
+    const url = `${this.dataSources.satellite}?lon=${this.location.longitude}&lat=${this.location.latitude}&date=2024-01-01&dim=0.5&api_key=${this.apiKeys.satellite}`;
         
         try {
             const response = await fetch(url);

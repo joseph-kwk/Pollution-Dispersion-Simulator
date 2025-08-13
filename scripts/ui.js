@@ -1,12 +1,17 @@
 // Get DOM elements
 const canvas = document.getElementById('simulationCanvas');
-const ctx = canvas.getContext('2d');
+const overlayCanvas = document.getElementById('overlayCanvas');
+const ctx = overlayCanvas.getContext('2d');
 const messageBox = document.getElementById('messageBox');
 const messageText = document.getElementById('messageText');
 
 // UI state
 let settingSource = false;
 let tooltips = new Map();
+let obstacleBrushEnabled = false;
+let obstacleBrushSize = 2;
+let obstacleMode = 'paint'; // 'paint' | 'erase'
+let isMouseDown = false;
 
 // UI parameters (exposed globally for simulation.js)
 window.windDirection = 0;
@@ -114,23 +119,16 @@ function resizeCanvas() {
     const size = Math.min(container.offsetWidth, container.offsetHeight, 600);
     canvas.width = size;
     canvas.height = size;
+    if (overlayCanvas) { overlayCanvas.width = size; overlayCanvas.height = size; }
     window.CELL_SIZE = canvas.width / GRID_SIZE;
     draw();
 }
 
 // Draw function with enhanced modern visuals
 function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
-    // Create modern gradient background
-    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-    gradient.addColorStop(0, '#e0f2fe');
-    gradient.addColorStop(0.5, '#bae6fd');
-    gradient.addColorStop(1, '#7dd3fc');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    // Add subtle animated water pattern
+    // Overlays only: subtle animated water pattern (visual only)
     const time = Date.now() / 2000;
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
     ctx.lineWidth = 1;
@@ -145,39 +143,12 @@ function draw() {
     }
     ctx.stroke();
 
-    // Draw grid cells with enhanced pollution effects
+    // Draw obstacles overlay first
+    drawObstaclesOverlay(ctx);
+
+    // GPU draws the base pollutant field; we only add overlays/effects here
     const currentType = window.pollutionSource.type;
     const pollutantType = window.POLLUTANT_TYPES[currentType];
-
-    for (let r = 0; r < GRID_SIZE; r++) {
-        for (let c = 0; c < GRID_SIZE; c++) {
-            const density = window.pollutantGrid[r][c];
-            if (density > 0) {
-                const x = c * window.CELL_SIZE;
-                const y = r * window.CELL_SIZE;
-                const normalizedDensity = Math.min(1, density / 255);
-                
-                // Create radial gradient for pollution cells
-                const cellGradient = ctx.createRadialGradient(
-                    x + window.CELL_SIZE / 2, y + window.CELL_SIZE / 2, 0,
-                    x + window.CELL_SIZE / 2, y + window.CELL_SIZE / 2, window.CELL_SIZE / 2
-                );
-                
-                const color = window.getColorForDensity(density, currentType);
-                const rgba = hexToRgba(color, normalizedDensity * 0.9);
-                const rgbaLight = hexToRgba(color, normalizedDensity * 0.3);
-                
-                cellGradient.addColorStop(0, rgba);
-                cellGradient.addColorStop(1, rgbaLight);
-                
-                ctx.fillStyle = cellGradient;
-                ctx.fillRect(x, y, window.CELL_SIZE, window.CELL_SIZE);
-                
-                // Add type-specific visual effects
-                addPollutionEffects(ctx, x, y, density, pollutantType, time);
-            }
-        }
-    }
 
     // Draw pollution source with pulsing effect
     if (window.pollutionSource) {
@@ -201,7 +172,7 @@ function draw() {
         
         // Source marker
         ctx.fillStyle = `rgba(239, 68, 68, ${pulse})`;
-        ctx.fillRect(sourceX, sourceY, window.CELL_SIZE, window.CELL_SIZE);
+    ctx.fillRect(sourceX, sourceY, window.CELL_SIZE, window.CELL_SIZE);
         
         // Source icon
         ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
@@ -418,6 +389,112 @@ function setupEventHandlers() {
         updateCurrentTypeGradient();
         showMessage(`Changed to ${window.POLLUTANT_TYPES[event.target.value].name}`, 'info', 1500);
     });
+
+    // Obstacles UI
+    const brushToggle = document.getElementById('obstacleBrushToggle');
+    const clearBtn = document.getElementById('clearObstaclesBtn');
+    const brushSizeInput = document.getElementById('brushSize');
+    const brushSizeValue = document.getElementById('brushSizeValue');
+    const modeSelect = document.getElementById('obstacleMode');
+
+    if (brushToggle) {
+        brushToggle.addEventListener('click', () => {
+            obstacleBrushEnabled = !obstacleBrushEnabled;
+            brushToggle.classList.toggle('btn-primary', obstacleBrushEnabled);
+            brushToggle.classList.toggle('btn-secondary', !obstacleBrushEnabled);
+            showMessage(`Obstacle brush ${obstacleBrushEnabled ? 'enabled' : 'disabled'}.`, 'info', 1200);
+        });
+    }
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            if (!window.obstacleMask) return;
+            for (let r = 0; r < window.obstacleMask.length; r++) {
+                window.obstacleMask[r].fill(0);
+            }
+            window.obstaclesDirty = true;
+            draw();
+            showMessage('Obstacles cleared.', 'success', 1200);
+        });
+    }
+    if (brushSizeInput && brushSizeValue) {
+        brushSizeInput.addEventListener('input', (e) => {
+            obstacleBrushSize = parseInt(e.target.value, 10);
+            brushSizeValue.textContent = obstacleBrushSize;
+        });
+    }
+    if (modeSelect) {
+        modeSelect.addEventListener('change', (e) => {
+            obstacleMode = e.target.value;
+        });
+    }
+
+    // Canvas obstacle painting
+    const targetCanvas = overlayCanvas || canvas;
+    targetCanvas.addEventListener('mousedown', (event) => {
+        isMouseDown = true;
+        handleCanvasPaint(event);
+    });
+    window.addEventListener('mouseup', () => { isMouseDown = false; });
+    targetCanvas.addEventListener('mousemove', (event) => {
+        if (isMouseDown) handleCanvasPaint(event);
+    });
+    targetCanvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    // Scenario save/load/delete
+    const saveBtn = document.getElementById('saveScenarioBtn');
+    const loadBtn = document.getElementById('loadScenarioBtn');
+    const deleteBtn = document.getElementById('deleteScenarioBtn');
+    const nameInput = document.getElementById('scenarioName');
+    const selectEl = document.getElementById('scenarioSelect');
+
+    const scenarioManager = new (window.ScenarioManager || function(){})();
+
+    function refreshScenarioList() {
+        if (!scenarioManager.list) return;
+        const names = scenarioManager.list();
+        selectEl.innerHTML = '<option value="">Select saved scenario</option>' +
+          names.map(n => `<option value="${n}">${n}</option>`).join('');
+    }
+
+    if (saveBtn && scenarioManager.save) {
+        saveBtn.addEventListener('click', () => {
+            const name = (nameInput?.value || '').trim();
+            if (!name) { showMessage('Enter scenario name.', 'warning', 1500); return; }
+            const state = (window.ScenarioManager && window.ScenarioManager.captureCurrentState)
+                ? window.ScenarioManager.captureCurrentState() : null;
+            if (!state) { showMessage('Unable to capture state.', 'error', 2000); return; }
+            scenarioManager.save(name, state);
+            refreshScenarioList();
+            showMessage('Scenario saved.', 'success', 1200);
+        });
+    }
+
+    if (loadBtn && scenarioManager.get) {
+        loadBtn.addEventListener('click', () => {
+            const sel = selectEl?.value;
+            if (!sel) { showMessage('Select a scenario to load.', 'warning', 1500); return; }
+            const scenario = scenarioManager.get(sel);
+            if (scenario?.data && window.ScenarioManager?.applyState) {
+                window.ScenarioManager.applyState(scenario.data);
+                showMessage('Scenario loaded.', 'success', 1200);
+            } else {
+                showMessage('Scenario not found or invalid.', 'error', 2000);
+            }
+        });
+    }
+
+    if (deleteBtn && scenarioManager.remove) {
+        deleteBtn.addEventListener('click', () => {
+            const sel = selectEl?.value;
+            if (!sel) { showMessage('Select a scenario to delete.', 'warning', 1500); return; }
+            scenarioManager.remove(sel);
+            refreshScenarioList();
+            showMessage('Scenario deleted.', 'info', 1200);
+        });
+    }
+
+    // Populate scenarios initially
+    refreshScenarioList();
 }
 
 // Initialize color legend with modern styling
@@ -486,3 +563,53 @@ window.addEventListener('load', () => {
     // Expose draw function for simulation.js
     window.draw = draw;
 });
+
+function handleCanvasPaint(event) {
+    if (!obstacleBrushEnabled || !window.obstacleMask) return;
+
+    const rect = (overlayCanvas || canvas).getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (event.clientX - rect.left) * scaleX;
+    const y = (event.clientY - rect.top) * scaleY;
+
+    const gridX = Math.floor(x / window.CELL_SIZE);
+    const gridY = Math.floor(y / window.CELL_SIZE);
+
+    const radius = Math.max(1, obstacleBrushSize);
+    const erase = event.button === 2 || obstacleMode === 'erase';
+
+    for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+            if (dx*dx + dy*dy <= radius*radius) {
+                const rr = gridY + dy;
+                const cc = gridX + dx;
+                if (rr >= 0 && rr < GRID_SIZE && cc >= 0 && cc < GRID_SIZE) {
+                    const nextVal = erase ? 0 : 1;
+                    if (window.obstacleMask[rr][cc] !== nextVal) {
+                        window.obstacleMask[rr][cc] = nextVal;
+                        window.obstaclesDirty = true;
+                    }
+                }
+            }
+        }
+    }
+    draw();
+}
+
+function drawObstaclesOverlay(ctx) {
+    if (!window.obstacleMask) return;
+    ctx.save();
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = '#111827';
+    for (let r = 0; r < GRID_SIZE; r++) {
+        for (let c = 0; c < GRID_SIZE; c++) {
+            if (window.obstacleMask[r][c] === 1) {
+                const x = c * window.CELL_SIZE;
+                const y = r * window.CELL_SIZE;
+                ctx.fillRect(x, y, window.CELL_SIZE, window.CELL_SIZE);
+            }
+        }
+    }
+    ctx.restore();
+}

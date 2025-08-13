@@ -154,6 +154,59 @@
                 </div>
             </div>
 
+            <!-- Obstacles -->
+            <div class="control-section">
+                <h3 class="section-title">Obstacles</h3>
+
+                <div class="control-group">
+                    <label class="control-label" data-tooltip="Toggle obstacle brush to paint barriers (no-flow)">
+                        <span>
+                            <i data-lucide="brush" style="width: 14px; height: 14px; margin-right: 4px;"></i>
+                            Brush
+                        </span>
+                    </label>
+                    <div class="btn-group" style="grid-template-columns: 1fr 1fr;">
+                        <button id="obstacleBrushToggle" class="btn btn-secondary ripple" data-tooltip="Enable/Disable obstacle brush">
+                            <i data-lucide="pen-tool"></i> Toggle
+                        </button>
+                        <button id="clearObstaclesBtn" class="btn btn-danger ripple" data-tooltip="Clear all obstacles">
+                            <i data-lucide="eraser"></i> Clear
+                        </button>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label class="control-label" data-tooltip="Brush size in grid cells">
+                        <span>
+                            <i data-lucide="circle" style="width: 14px; height: 14px; margin-right: 4px;"></i>
+                            Brush Size
+                        </span>
+                        <span class="control-value" id="brushSizeValue">2</span>
+                    </label>
+                    <div class="range-container">
+                        <input type="range" id="brushSize" class="range-input" min="1" max="8" step="1" value="2">
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label class="control-label" data-tooltip="Brush mode">
+                        <span>
+                            <i data-lucide="toggle-left" style="width: 14px; height: 14px; margin-right: 4px;"></i>
+                            Mode
+                        </span>
+                    </label>
+                    <div class="select-container">
+                        <select id="obstacleMode" class="select-input">
+                            <option value="paint">Paint</option>
+                            <option value="erase">Erase</option>
+                        </select>
+                    </div>
+                    <div style="font-size: var(--font-size-xs); color: var(--text-tertiary); margin-top: var(--spacing-xs);">
+                        Tip: Right-click temporarily erases while painting.
+                    </div>
+                </div>
+            </div>
+
             <!-- Visualization -->
             <div class="control-section">
                 <h3 class="section-title">Visualization</h3>
@@ -169,12 +222,35 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Scenarios -->
+            <div class="control-section">
+                <h3 class="section-title">Scenarios</h3>
+                <div class="control-group">
+                    <div style="display:flex; gap: var(--spacing-sm);">
+                        <input id="scenarioName" class="select-input" placeholder="Scenario name" style="flex:1;" />
+                        <button id="saveScenarioBtn" class="btn btn-secondary" data-tooltip="Save current setup">Save</button>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <div class="select-container">
+                        <select id="scenarioSelect" class="select-input">
+                            <option value="">Select saved scenario</option>
+                        </select>
+                    </div>
+                    <div class="btn-group" style="grid-template-columns: 1fr 1fr; margin-top: var(--spacing-sm);">
+                        <button id="loadScenarioBtn" class="btn btn-primary" data-tooltip="Load selected scenario"><i data-lucide="download"></i>Load</button>
+                        <button id="deleteScenarioBtn" class="btn btn-danger" data-tooltip="Delete selected scenario"><i data-lucide="trash-2"></i>Delete</button>
+                    </div>
+                </div>
+            </div>
         </aside>
 
         <!-- Main Content -->
         <main class="app-main">
             <div class="simulation-container">
                 <canvas id="simulationCanvas"></canvas>
+                <canvas id="overlayCanvas" style="position:absolute; inset:0; pointer-events:none;"></canvas>
                 
                 <!-- Simulation Overlay -->
                 <div class="simulation-overlay">
@@ -230,6 +306,7 @@
 
     <!-- Scripts -->
     <script src="scripts/webglSimulation.js"></script>
+    <script src="scripts/sourceManager.js"></script>
     <script src="scripts/gpuAcceleration.js"></script>
     <script src="scripts/simulation.js"></script>
     <script src="scripts/ui.js"></script>
