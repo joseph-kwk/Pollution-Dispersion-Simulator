@@ -8,7 +8,7 @@ export const SimulationCanvas: React.FC = () => {
   const { grid, sources, parameters, isRunning, obstacles, actions } = useSimulationStore();
 
   // Initialize fluid dynamics engine
-  const fluidDynamics = useMemo(() => new FluidDynamics(), []);
+  const fluidDynamics = useMemo(() => new FluidDynamics(GRID_SIZE, canvasRef.current || undefined), []);
 
   // Color mapping function
   const getColorForDensity = useCallback((density: number, type: keyof typeof POLLUTANT_TYPES = 'CHEMICAL') => {
@@ -152,16 +152,8 @@ export const SimulationCanvas: React.FC = () => {
   const simulateStep = useCallback(() => {
     if (!isRunning) return;
 
-    // Add pollution at sources
-    sources.forEach((source: PollutionSource) => {
-      if (source.active && source.x >= 0 && source.y >= 0 &&
-          source.x < GRID_SIZE && source.y < GRID_SIZE) {
-        fluidDynamics.addDensitySource(source.x, source.y, parameters.releaseRate);
-      }
-    });
-
     // Step the fluid dynamics simulation
-    fluidDynamics.step(parameters);
+    fluidDynamics.step(parameters, sources);
 
     // Update the store with the new density grid
     const newGrid = fluidDynamics.getDensity();

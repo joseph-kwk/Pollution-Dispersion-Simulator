@@ -1,4 +1,5 @@
-import { GRID_SIZE, SimulationParameters } from '@/types';
+import { GRID_SIZE, SimulationParameters, PollutionSource } from '@/types';
+import { WebGLSimulationEngine } from './WebGLSimulationEngine';
 
 export class FluidDynamics {
   private gridSize: number;
@@ -17,9 +18,25 @@ export class FluidDynamics {
   // Obstacles
   private obstacles!: boolean[][];
 
-  constructor(gridSize: number = GRID_SIZE) {
+  // GPU acceleration
+  private gpuEngine: WebGLSimulationEngine | null = null;
+  private useGPU: boolean = false;
+
+  constructor(gridSize: number = GRID_SIZE, canvas?: HTMLCanvasElement) {
     this.gridSize = gridSize;
     this.initializeFields();
+
+    // Try to initialize GPU acceleration
+    if (canvas && WebGLSimulationEngine.isSupported()) {
+      try {
+        this.gpuEngine = new WebGLSimulationEngine(canvas, gridSize);
+        this.useGPU = true;
+        console.log('GPU acceleration enabled');
+      } catch (error) {
+        console.warn('GPU acceleration failed to initialize:', error);
+        this.useGPU = false;
+      }
+    }
   }
 
   private initializeFields(): void {
@@ -136,7 +153,26 @@ export class FluidDynamics {
   }
 
   // Main simulation step
-  step(parameters: SimulationParameters): void {
+  step(parameters: SimulationParameters, sources: PollutionSource[] = []): void {
+    if (this.useGPU && this.gpuEngine) {
+      // Use GPU acceleration
+      this.gpuEngine.simulateFrame(this.density, parameters, sources, this.obstacles, { readback: true });
+    } else {
+      // Use CPU simulation
+      this.cpuStep(parameters, sources);
+    }
+  }
+
+  // CPU-based simulation (original implementation)
+  private cpuStep(parameters: SimulationParameters, sources: PollutionSource[]): void {
+    // Add pollution at sources
+    sources.forEach((source: PollutionSource) => {
+      if (source.active && source.x >= 0 && source.y >= 0 &&
+          source.x < this.gridSize && source.y < this.gridSize) {
+        this.addDensitySource(source.x, source.y, parameters.releaseRate);
+      }
+    });
+
     // Set velocity field based on wind parameters
     this.setVelocityField(parameters.windDirection, parameters.windSpeed);
 
