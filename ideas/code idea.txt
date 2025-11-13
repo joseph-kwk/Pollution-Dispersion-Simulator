@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pollution Dispersion Simulator</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Light blue-gray background */
+        }
+        .container {
+            max-width: 1200px;
+        }
+        canvas {
+            border: 1px solid #cbd5e1; /* border-gray-300 */
+            background-color: #e2e8f0; /* bg-gray-200 */
+            cursor: crosshair;
+        }
+        .control-group label {
+            font-weight: 500;
+            color: #4a5568; /* text-gray-700 */
+        }
+        .control-group input[type="range"] {
+            width: 100%;
+        }
+        .btn {
+            @apply px-4 py-2 rounded-md font-semibold transition-colors duration-200;
+        }
+        .btn-primary {
+            @apply bg-blue-600 text-white hover:bg-blue-700 shadow-md;
+        }
+        .btn-secondary {
+            @apply bg-gray-300 text-gray-800 hover:bg-gray-400 shadow-md;
+        }
+        .btn-danger {
+            @apply bg-red-500 text-white hover:bg-red-600 shadow-md;
+        }
+        .legend-item {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 flex items-center justify-center min-h-screen">
+    <div class="container bg-white shadow-xl rounded-lg p-6 md:p-8 flex flex-col lg:flex-row gap-8">
+        <!-- Main Simulation Area -->
+        <div class="flex-grow flex flex-col items-center justify-center">
+            <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Pollution Dispersion Simulator</h1>
+            <div class="relative w-full max-w-lg aspect-square mb-6">
+                <canvas id="simulationCanvas" class="w-full h-full rounded-lg shadow-inner"></canvas>
+                <div id="messageBox" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black bg-opacity-70 text-white px-4 py-2 rounded-md hidden">
+                    <!-- Messages will appear here -->
+                </div>
+            </div>
+
+            <!-- Color Legend -->
+            <div class="flex items-center gap-2 text-sm text-gray-700">
+                <span class="mr-2">Pollution Density:</span>
+                <div class="flex items-center gap-1">
+                    <div class="legend-item bg-blue-200"></div> <span class="mr-1">Low</span>
+                    <div class="legend-item bg-blue-400"></div>
+                    <div class="legend-item bg-blue-600"></div>
+                    <div class="legend-item bg-red-400"></div>
+                    <div class="legend-item bg-red-600"></div> <span class="ml-1">High</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="w-full lg:w-80 flex-shrink-0 bg-gray-50 p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4">Controls</h2>
+
+            <div class="flex flex-col gap-5">
+                <!-- Simulation Controls -->
+                <div class="flex gap-3">
+                    <button id="startButton" class="btn btn-primary flex-1">Start</button>
+                    <button id="pauseButton" class="btn btn-secondary flex-1">Pause</button>
+                    <button id="resetButton" class="btn btn-danger flex-1">Reset</button>
+                </div>
+
+                <!-- Pollution Source -->
+                <div class="control-group">
+                    <label for="pollutionSource" class="block mb-2">Click on canvas to set pollution source (Red Dot)</label>
+                    <button id="setSourceButton" class="btn btn-secondary w-full">Set Source</button>
+                </div>
+
+                <!-- Wind Direction -->
+                <div class="control-group">
+                    <label for="windDirection" class="block mb-2">Wind Direction: <span id="windDirectionValue">0</span>&deg;</label>
+                    <input type="range" id="windDirection" min="0" max="360" value="0" class="accent-blue-500">
+                </div>
+
+                <!-- Wind Speed -->
+                <div class="control-group">
+                    <label for="windSpeed" class="block mb-2">Wind Speed: <span id="windSpeedValue">0.5</span></label>
+                    <input type="range" id="windSpeed" min="0" max="2" step="0.1" value="0.5" class="accent-blue-500">
+                </div>
+
+                <!-- Diffusion Rate -->
+                <div class="control-group">
+                    <label for="diffusionRate" class="block mb-2">Diffusion Rate: <span id="diffusionRateValue">0.1</span></label>
+                    <input type="range" id="diffusionRate" min="0" max="0.5" step="0.01" value="0.1" class="accent-blue-500">
+                </div>
+
+                <!-- Pollution Release Rate -->
+                <div class="control-group">
+                    <label for="releaseRate" class="block mb-2">Release Rate: <span id="releaseRateValue">10</span></label>
+                    <input type="range" id="releaseRate" min="0" max="100" step="1" value="10" class="accent-blue-500">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('simulationCanvas');
+        const ctx = canvas.getContext('2d');
+        const messageBox = document.getElementById('messageBox');
+
+        const GRID_SIZE = 80; // Size of the simulation grid (e.g., 80x80 cells)
+        let CELL_SIZE; // Calculated dynamically based on canvas size
+
+        let pollutantGrid = [];
+        let newPollutantGrid = []; // Used for calculations to avoid immediate updates
+        let animationFrameId;
+        let isRunning = false;
+        let pollutionSource = { x: Math.floor(GRID_SIZE / 2), y: Math.floor(GRID_SIZE / 2) }; // Center initial source
+        let settingSource = false; // Flag for setting pollution source via click
+
+        // Simulation parameters (exposed to UI)
+        let windDirection = 0; // degrees
+        let windSpeed = 0.5;
+        let diffusionRate = 0.1; // 0 to 1, higher means faster spreading
+        let releaseRate = 10; // Amount of pollutant released per frame at source
+
+        // UI elements
+        const startButton = document.getElementById('startButton');
+        const pauseButton = document.getElementById('pauseButton');
+        const resetButton = document.getElementById('resetButton');
+        const setSourceButton = document.getElementById('setSourceButton');
+        const windDirectionInput = document.getElementById('windDirection');
+        const windSpeedInput = document.getElementById('windSpeed');
+        const diffusionRateInput = document.getElementById('diffusionRate');
+        const releaseRateInput = document.getElementById('releaseRate');
+        const windDirectionValueSpan = document.getElementById('windDirectionValue');
+        const windSpeedValueSpan = document.getElementById('windSpeedValue');
+        const diffusionRateValueSpan = document.getElementById('diffusionRateValue');
+        const releaseRateValueSpan = document.getElementById('releaseRateValue');
+
+        /**
+         * Displays a temporary message to the user.
+         * @param {string} message The message to display.
+         * @param {number} duration The duration in milliseconds to show the message.
+         */
+        function showMessage(message, duration = 2000) {
+            messageBox.textContent = message;
+            messageBox.classList.remove('hidden');
+            setTimeout(() => {
+                messageBox.classList.add('hidden');
+            }, duration);
+        }
+
+        /**
+         * Initializes the pollutant grid with zeros.
+         */
+        function initializeGrid() {
+            pollutantGrid = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0));
+            newPollutantGrid = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0));
+            draw(); // Draw the initial empty grid
+        }
+
+        /**
+         * Resizes the canvas to be a square and calculates cell size.
+         */
+        function resizeCanvas() {
+            const size = Math.min(canvas.parentElement.offsetWidth, canvas.parentElement.offsetHeight);
+            canvas.width = size;
+            canvas.height = size;
+            CELL_SIZE = canvas.width / GRID_SIZE;
+            draw(); // Redraw after resize
+        }
+
+        /**
+         * Converts a pollution density value to a color.
+         * @param {number} density The pollution density (0-1).
+         * @returns {string} A CSS color string (e.g., 'rgba(255,0,0,0.5)').
+         */
+        function getColorForDensity(density) {
+            // Scale density to 0-1 for color mapping
+            const normalizedDensity = Math.min(1, Math.max(0, density / 255)); // Max density can be high due to continuous release
+
+            // Interpolate between light blue (low) and red (high)
+            // Example:
+            // 0   - 0.2: Light blue to medium blue
+            // 0.2 - 0.5: Medium blue to dark blue/purple
+            // 0.5 - 0.8: Dark blue/purple to orange
+            // 0.8 - 1.0: Orange to red
+
+            let r, g, b;
+
+            if (normalizedDensity < 0.2) {
+                // From light blue to medium blue
+                r = Math.floor(66 + (20 * normalizedDensity / 0.2));
+                g = Math.floor(135 + (20 * normalizedDensity / 0.2));
+                b = Math.floor(245 - (10 * normalizedDensity / 0.2));
+            } else if (normalizedDensity < 0.5) {
+                // From medium blue to dark blue/purple
+                r = Math.floor(86 + (80 * (normalizedDensity - 0.2) / 0.3));
+                g = Math.floor(155 - (100 * (normalizedDensity - 0.2) / 0.3));
+                b = Math.floor(235 - (150 * (normalizedDensity - 0.2) / 0.3));
+            } else if (normalizedDensity < 0.8) {
+                // From dark blue/purple to orange
+                r = Math.floor(166 + (90 * (normalizedDensity - 0.5) / 0.3));
+                g = Math.floor(55 + (150 * (normalizedDensity - 0.5) / 0.3));
+                b = Math.floor(85 - (80 * (normalizedDensity - 0.5) / 0.3));
+            } else {
+                // From orange to red
+                r = Math.floor(255);
+                g = Math.floor(205 - (205 * (normalizedDensity - 0.8) / 0.2));
+                b = Math.floor(5 - (5 * (normalizedDensity - 0.8) / 0.2));
+            }
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+
+
+        /**
+         * Draws the current state of the pollutant grid on the canvas.
+         */
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const density = pollutantGrid[r][c];
+                    if (density > 0) {
+                        ctx.fillStyle = getColorForDensity(density);
+                        ctx.fillRect(c * CELL_SIZE, r * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+                    }
+                }
+            }
+
+            // Draw pollution source
+            if (pollutionSource) {
+                ctx.fillStyle = 'red';
+                ctx.beginPath();
+                ctx.arc(
+                    pollutionSource.x * CELL_SIZE + CELL_SIZE / 2,
+                    pollutionSource.y * CELL_SIZE + CELL_SIZE / 2,
+                    CELL_SIZE / 3, // Smaller circle for source
+                    0, Math.PI * 2
+                );
+                ctx.fill();
+            }
+        }
+
+        /**
+         * Simulates one step of pollution dispersion.
+         */
+        function simulateStep() {
+            // Clear the new grid for current calculations
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    newPollutantGrid[r][c] = 0;
+                }
+            }
+
+            // Add pollutant at the source
+            if (pollutionSource && pollutionSource.x >= 0 && pollutionSource.y >= 0 &&
+                pollutionSource.x < GRID_SIZE && pollutionSource.y < GRID_SIZE) {
+                pollutantGrid[pollutionSource.y][pollutionSource.x] += releaseRate;
+            }
+
+            // Calculate wind vector components (radians for Math.cos/sin)
+            const windAngleRad = windDirection * Math.PI / 180;
+            const windVelX = windSpeed * Math.cos(windAngleRad);
+            const windVelY = windSpeed * Math.sin(windAngleRad);
+
+            // Advection and Diffusion
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const currentDensity = pollutantGrid[r][c];
+
+                    if (currentDensity > 0) {
+                        // Advection (simplified: move to new target cell)
+                        // Calculate previous position to pull from
+                        let prevC = c - windVelX;
+                        let prevR = r - windVelY;
+
+                        // Ensure previous coordinates are within bounds (or handle boundary conditions)
+                        // For simplicity, we'll use a basic clamp.
+                        prevC = Math.min(GRID_SIZE - 1, Math.max(0, prevC));
+                        prevR = Math.min(GRID_SIZE - 1, Math.max(0, prevR));
+
+                        // Get pollutant from the 'advected from' cell (using linear interpolation)
+                        const advectedDensity = getInterpolatedDensity(pollutantGrid, prevR, prevC);
+                        newPollutantGrid[r][c] += advectedDensity;
+
+                        // Diffusion
+                        const diffusedAmount = currentDensity * diffusionRate; // Amount to diffuse out
+                        const retainedAmount = currentDensity - diffusedAmount; // Amount staying in current cell
+
+                        newPollutantGrid[r][c] += retainedAmount; // Add retained amount
+
+                        // Distribute diffused amount to neighbors
+                        // This is a simple, iterative diffusion. A more accurate solver would involve multiple passes.
+                        const neighbors = [
+                            { dr: -1, dc: 0 }, { dr: 1, dc: 0 }, { dr: 0, dc: -1 }, { dr: 0, dc: 1 }
+                        ];
+                        const amountPerNeighbor = diffusedAmount / neighbors.length;
+
+                        for (const neighbor of neighbors) {
+                            const nr = r + neighbor.dr;
+                            const nc = c + neighbor.dc;
+
+                            if (nr >= 0 && nr < GRID_SIZE && nc >= 0 && nc < GRID_SIZE) {
+                                newPollutantGrid[nr][nc] += amountPerNeighbor;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Apply a slight decay to prevent indefinite accumulation (optional)
+            const decayFactor = 0.99; // Retain 99% of pollutant per step
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    newPollutantGrid[r][c] *= decayFactor;
+                }
+            }
+
+
+            // Swap grids for next iteration
+            // Clamp values to prevent excessive growth (e.g., max 255 for visualization)
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    pollutantGrid[r][c] = Math.min(255, Math.max(0, newPollutantGrid[r][c]));
+                }
+            }
+        }
+
+        /**
+         * Helper function for basic linear interpolation of density from grid.
+         * Used for advection to get density from fractional coordinates.
+         * @param {Array<Array<number>>} grid The grid to sample from.
+         * @param {number} r Fractional row coordinate.
+         * @param {number} c Fractional column coordinate.
+         * @returns {number} Interpolated density value.
+         */
+        function getInterpolatedDensity(grid, r, c) {
+            const r0 = Math.floor(r);
+            const c0 = Math.floor(c);
+            const r1 = r0 + 1;
+            const c1 = c0 + 1;
+
+            const fr = r - r0; // Fractional part of row
+            const fc = c - c0; // Fractional part of col
+
+            // Bilinear interpolation
+            let val = 0;
+            if (r0 >= 0 && r0 < GRID_SIZE && c0 >= 0 && c0 < GRID_SIZE) {
+                val += grid[r0][c0] * (1 - fr) * (1 - fc);
+            }
+            if (r0 >= 0 && r0 < GRID_SIZE && c1 >= 0 && c1 < GRID_SIZE) {
+                val += grid[r0][c1] * (1 - fr) * fc;
+            }
+            if (r1 >= 0 && r1 < GRID_SIZE && c0 >= 0 && c0 < GRID_SIZE) {
+                val += grid[r1][c0] * fr * (1 - fc);
+            }
+            if (r1 >= 0 && r1 < GRID_SIZE && c1 >= 0 && c1 < GRID_SIZE) {
+                val += grid[r1][c1] * fr * fc;
+            }
+            return val;
+        }
+
+
+        /**
+         * The main animation loop.
+         */
+        function animate() {
+            if (!isRunning) {
+                return;
+            }
+
+            simulateStep();
+            draw();
+            animationFrameId = requestAnimationFrame(animate);
+        }
+
+        // --- Event Listeners and UI Setup ---
+
+        startButton.addEventListener('click', () => {
+            if (!isRunning) {
+                isRunning = true;
+                animate();
+                showMessage("Simulation started!", 1500);
+            }
+        });
+
+        pauseButton.addEventListener('click', () => {
+            if (isRunning) {
+                isRunning = false;
+                cancelAnimationFrame(animationFrameId);
+                showMessage("Simulation paused.", 1500);
+            }
+        });
+
+        resetButton.addEventListener('click', () => {
+            isRunning = false;
+            cancelAnimationFrame(animationFrameId);
+            initializeGrid();
+            showMessage("Simulation reset.", 1500);
+        });
+
+        setSourceButton.addEventListener('click', () => {
+            settingSource = !settingSource;
+            if (settingSource) {
+                setSourceButton.textContent = "Click on canvas to place source";
+                setSourceButton.classList.remove('btn-secondary');
+                setSourceButton.classList.add('bg-purple-500', 'hover:bg-purple-600', 'text-white');
+                showMessage("Click on the canvas to set the pollution source.", 3000);
+            } else {
+                setSourceButton.textContent = "Set Source";
+                setSourceButton.classList.add('btn-secondary');
+                setSourceButton.classList.remove('bg-purple-500', 'hover:bg-purple-600', 'text-white');
+            }
+        });
+
+        canvas.addEventListener('click', (event) => {
+            if (settingSource) {
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                const x = (event.clientX - rect.left) * scaleX;
+                const y = (event.clientY - rect.top) * scaleY;
+
+                pollutionSource.x = Math.floor(x / CELL_SIZE);
+                pollutionSource.y = Math.floor(y / CELL_SIZE);
+                showMessage(`Pollution source set at (${pollutionSource.x}, ${pollutionSource.y})`, 2000);
+                settingSource = false; // Reset flag after setting source
+                setSourceButton.textContent = "Set Source";
+                setSourceButton.classList.add('btn-secondary');
+                setSourceButton.classList.remove('bg-purple-500', 'hover:bg-purple-600', 'text-white');
+                draw(); // Redraw to show new source location
+            }
+        });
+
+        windDirectionInput.addEventListener('input', (event) => {
+            windDirection = parseInt(event.target.value);
+            windDirectionValueSpan.textContent = windDirection;
+        });
+
+        windSpeedInput.addEventListener('input', (event) => {
+            windSpeed = parseFloat(event.target.value);
+            windSpeedValueSpan.textContent = windSpeed.toFixed(1);
+        });
+
+        diffusionRateInput.addEventListener('input', (event) => {
+            diffusionRate = parseFloat(event.target.value);
+            diffusionRateValueSpan.textContent = diffusionRate.toFixed(2);
+        });
+
+        releaseRateInput.addEventListener('input', (event) => {
+            releaseRate = parseInt(event.target.value);
+            releaseRateValueSpan.textContent = releaseRate;
+        });
+
+        // Initialize on window load
+        window.onload = () => {
+            resizeCanvas();
+            initializeGrid();
+            // Add event listener for window resize to make canvas responsive
+            window.addEventListener('resize', resizeCanvas);
+        };
+
+    </script>
+</body>
+</html>
+
+
+
+
+What the Code Does:
+
+Visual 2D Grid: Renders a square grid on an HTML <canvas>.
+Pollutant Density: Each cell's color represents the pollutant concentration (from light blue for low to red for high).
+User-Defined Source: You can click the "Set Source" button and then click on the canvas to place the pollution origin.
+Advection (Wind): The "Wind Direction" and "Wind Speed" sliders control a uniform wind that carries the pollutant across the grid.
+Diffusion: The "Diffusion Rate" slider controls how quickly the pollutant naturally spreads outwards from its source and with the wind.
+Release Rate: The "Release Rate" slider controls how much pollutant is added at the source per simulation step.
+Controls: "Start," "Pause," and "Reset" buttons manage the simulation's state.
+Responsiveness: The canvas resizes with the window, maintaining its square aspect ratio.
+To Run This Code:
+
+Save the entire code block (from <!DOCTYPE html> to </html>) as an .html file (e.g., pollution_sim.html).
+Open this .html file in any modern web browser.
+Next Steps and Future Improvements:
+
+Refine Simulation Algorithm: The current advection and diffusion are simplified. For more realistic fluid behavior, you could explore:
+Smoothed Particle Hydrodynamics (SPH): A particle-based method often used for liquids, good for splashes and turbulent flows.
+Stable Fluids Algorithm (Navier-Stokes based): A grid-based method that provides more physically accurate fluid behavior, including incompressible flow and turbulence. This is more complex but yields very compelling results.
+Add Obstacles/Boundaries: Implement the ability to draw or define static objects on the canvas that the fluid (and pollutant) would interact with, blocking flow or causing eddies.
+Multiple Pollutant Types: Introduce different pollutants with varying diffusion rates, colors, or even interaction properties.
+Visualize Wind Vectors: Add small arrows on the canvas to visually represent the wind direction across the grid, making the wind's influence more explicit.
+Performance Optimization: For larger grids or more complex algorithms, consider techniques like WebAssembly for performance-critical parts of the simulation or optimizing JavaScript loops.
+Interactive Wind/Currents: Instead of just a global wind, allow users to "draw" wind currents or create areas of higher/lower wind speed.
+Data Export/Analysis: Add functionality to record pollutant concentration over time at specific points or export the simulation data for external analysis.
+Time-Series Pollution Release: Allow users to define a pollution release profile over time (e.g., a burst, then tapering off).

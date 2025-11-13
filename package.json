@@ -1,0 +1,39 @@
+{
+  "name": "pollution-dispersion-simulator",
+  "version": "2.0.0",
+  "description": "Advanced pollution dispersion simulation with real-world data integration",
+  "main": "index.html",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "serve": "python -m http.server 8080"
+  },
+  "dependencies": {
+    "three": "^0.156.1"
+  },
+  "devDependencies": {
+    "vite": "^4.4.9"
+  },
+  "keywords": [
+    "pollution",
+    "dispersion",
+    "simulation",
+    "fluid-dynamics",
+    "environmental",
+    "visualization",
+    "webgl",
+    "real-time"
+  ],
+  "author": "Joseph KWK",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/joseph-kwk/Pollution-Dispersion-Simulator.git"
+  },
+  "bugs": {
+    "url": "https://github.com/joseph-kwk/Pollution-Dispersion-Simulator/issues"
+  },
+  "homepage": "https://joseph-kwk.github.io/Pollution-Dispersion-Simulator/"
+}

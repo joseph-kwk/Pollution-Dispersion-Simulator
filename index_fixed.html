@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pollution Dispersion Simulator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles/main.css">
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <h1 class="app-title">
+                    <i data-lucide="waves" style="width: 24px; height: 24px; margin-right: 8px;"></i>
+                    Pollution Dispersion Simulator
+                </h1>
+            </div>
+            <div class="header-right">
+                <div class="status-indicator" data-tooltip="System Status" data-tooltip-position="bottom">
+                    <div class="status-dot active"></div>
+                    <span id="systemStatus">Online</span>
+                </div>
+                <button class="theme-toggle" onclick="toggleTheme()" data-tooltip="Toggle Dark/Light Theme" data-tooltip-position="bottom">
+                    <i data-lucide="sun" id="themeIcon"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2 class="sidebar-title">Controls</h2>
+                <button class="sidebar-toggle" data-tooltip="Collapse Sidebar" data-tooltip-position="bottom">
+                    <i data-lucide="panel-left"></i>
+                </button>
+            </div>
+
+            <!-- GPU Status Section -->
+            <div class="control-section">
+                <h3 class="section-title">Performance</h3>
+                <div class="toggle-container" data-tooltip="Enable GPU acceleration for better performance">
+                    <div>
+                        <div style="font-weight: 600; font-size: 0.875rem;">GPU Acceleration</div>
+                        <div id="gpuStatus" style="font-size: 0.75rem; color: var(--text-tertiary);">Checking...</div>
+                    </div>
+                    <div class="toggle-switch" id="gpuToggle" onclick="window.toggleGPUAcceleration && window.toggleGPUAcceleration()">
+                        <div class="toggle-thumb"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Simulation Controls -->
+            <div class="control-section">
+                <h3 class="section-title">Simulation</h3>
+                
+                <div class="btn-group">
+                    <button id="startButton" class="btn btn-primary ripple scale-hover" data-tooltip="Start the pollution simulation">
+                        <i data-lucide="play" style="width: 16px; height: 16px;"></i>
+                        Start
+                    </button>
+                    <button id="pauseButton" class="btn btn-secondary ripple scale-hover" data-tooltip="Pause the simulation">
+                        <i data-lucide="pause" style="width: 16px; height: 16px;"></i>
+                        Pause
+                    </button>
+                    <button id="resetButton" class="btn btn-danger ripple scale-hover" data-tooltip="Reset simulation to initial state">
+                        <i data-lucide="refresh-cw" style="width: 16px; height: 16px;"></i>
+                        Reset
+                    </button>
+                    <button id="setSourceButton" class="btn btn-secondary ripple scale-hover" data-tooltip="Click to set pollution source location">
+                        <i data-lucide="map-pin" style="width: 16px; height: 16px;"></i>
+                        Set Source
+                    </button>
+                </div>
+
+                <!-- Pollution Type -->
+                <div class="control-group">
+                    <label class="control-label" data-tooltip="Select the type of pollutant to simulate">
+                        <span>Pollution Type</span>
+                    </label>
+                    <div class="select-container">
+                        <select id="pollutionTypeSelect" class="select-input">
+                            <option value="CHEMICAL">Chemical Pollution</option>
+                            <option value="OIL">Oil Spill</option>
+                            <option value="SEWAGE">Organic Waste</option>
+                            <option value="THERMAL">Thermal Pollution</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Environmental Controls -->
+            <div class="control-section">
+                <h3 class="section-title">Environment</h3>
+
+                <!-- Wind Direction -->
+                <div class="control-group">
+                    <label class="control-label" data-tooltip="Wind direction affects pollution dispersion patterns" data-tooltip-type="environment">
+                        <span>
+                            <i data-lucide="navigation" style="width: 14px; height: 14px; margin-right: 4px;"></i>
+                            Wind Direction
+                        </span>
+                        <span class="control-value" id="windDirectionValue">0°</span>
+                    </label>
+                    <div class="range-container">
+                        <input type="range" id="windDirection" class="range-input" min="0" max="360" value="0" step="1">
+                    </div>
+                </div>
+
+                <!-- Wind Speed -->
+                <div class="control-group">
+                    <label class="control-label" data-tooltip="Higher wind speeds increase pollution dispersal rate" data-tooltip-type="environment">
+                        <span>
+                            <i data-lucide="wind" style="width: 14px; height: 14px; margin-right: 4px;"></i>
+                            Wind Speed
+                        </span>
+                        <span class="control-value" id="windSpeedValue">0.5</span>
+                    </label>
+                    <div class="range-container">
+                        <input type="range" id="windSpeed" class="range-input" min="0" max="2" step="0.1" value="0.5">
+                    </div>
+                </div>
+
+                <!-- Diffusion Rate -->
+                <div class="control-group">
+                    <label class="control-label" data-tooltip="Controls how quickly pollution spreads naturally" data-tooltip-type="environment">
+                        <span>
+                            <i data-lucide="waves" style="width: 14px; height: 14px; margin-right: 4px;"></i>
+                            Diffusion Rate
+                        </span>
+                        <span class="control-value" id="diffusionRateValue">0.1</span>
+                    </label>
+                    <div class="range-container">
+                        <input type="range" id="diffusionRate" class="range-input" min="0" max="0.5" step="0.01" value="0.1">
+                    </div>
+                </div>
+
+                <!-- Release Rate -->
+                <div class="control-group">
+                    <label class="control-label" data-tooltip="Amount of pollution released per time unit" data-tooltip-type="environment">
+                        <span>
+                            <i data-lucide="droplets" style="width: 14px; height: 14px; margin-right: 4px;"></i>
+                            Release Rate
+                        </span>
+                        <span class="control-value" id="releaseRateValue">10</span>
+                    </label>
+                    <div class="range-container">
+                        <input type="range" id="releaseRate" class="range-input" min="1" max="50" value="10" step="1">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Visualization -->
+            <div class="control-section">
+                <h3 class="section-title">Visualization</h3>
+                
+                <div class="legend-container">
+                    <div class="legend-title">Pollution Density</div>
+                    <div class="legend-grid" id="colorLegend">
+                        <!-- Legend items will be added here by JavaScript -->
+                    </div>
+                    <div style="margin-top: var(--spacing-sm); display: flex; align-items: center; gap: var(--spacing-xs);">
+                        <div class="density-gradient" style="height: 8px; flex: 1; border-radius: var(--radius-sm);"></div>
+                        <span style="font-size: var(--font-size-xs); color: var(--text-tertiary);">Intensity →</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="app-main">
+            <div class="simulation-container">
+                <canvas id="simulationCanvas"></canvas>
+                
+                <!-- Simulation Overlay -->
+                <div class="simulation-overlay">
+                    <div class="overlay-panel performance-metrics">
+                        <div class="metric-row">
+                            <span>FPS:</span>
+                            <span class="metric-value" id="fpsDisplay">--</span>
+                        </div>
+                        <div class="metric-row">
+                            <span>Mode:</span>
+                            <span class="metric-value" id="computeModeDisplay">CPU</span>
+                        </div>
+                    </div>
+                    
+                    <div class="overlay-panel">
+                        <div style="font-size: var(--font-size-xs); color: var(--text-secondary);">
+                            <div>Click to set pollution source</div>
+                            <div>Use controls to adjust parameters</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Message Box -->
+                <div id="messageBox" class="overlay-panel" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; text-align: center;">
+                    <div style="font-weight: 600; margin-bottom: var(--spacing-xs);">Simulation Message</div>
+                    <div id="messageText" style="font-size: var(--font-size-sm); color: var(--text-secondary);"></div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Status Bar -->
+        <footer class="app-status">
+            <div class="status-section">
+                <div class="status-indicator">
+                    <span class="status-dot active"></span>
+                    <span>Simulation Ready</span>
+                </div>
+                <div class="status-indicator">
+                    <span class="status-dot" id="gpuStatusDot"></span>
+                    <span id="gpuStatusText">GPU: Checking</span>
+                </div>
+            </div>
+            
+            <div class="status-section">
+                <span style="font-size: var(--font-size-xs);">
+                    Grid: 80×80 | 
+                    WebGL: <span id="webglSupport">Unknown</span> |
+                    v2.0.0
+                </span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="scripts/webglSimulation.js"></script>
+    <script src="scripts/gpuAcceleration.js"></script>
+    <script src="scripts/simulation.js"></script>
+    <script src="scripts/ui.js"></script>
+    
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+        
+        // Theme toggle functionality
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            html.setAttribute('data-theme', newTheme);
+            
+            const themeIcon = document.getElementById('themeIcon');
+            themeIcon.setAttribute('data-lucide', newTheme === 'light' ? 'sun' : 'moon');
+            lucide.createIcons();
+            
+            localStorage.setItem('theme', newTheme);
+        }
+        
+        // Load saved theme
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        
+        // GPU toggle functionality
+        window.toggleGPUAcceleration = function() {
+            if (typeof useGPUAcceleration !== 'undefined') {
+                useGPUAcceleration = !useGPUAcceleration;
+                const toggle = document.getElementById('gpuToggle');
+                toggle.classList.toggle('active', useGPUAcceleration);
+                updatePerformanceDisplay();
+            }
+        };
+        
+        // Update WebGL support status
+        window.addEventListener('load', () => {
+            const canvas = document.createElement('canvas');
+            const gl = canvas.getContext('webgl2');
+            const webglSupport = document.getElementById('webglSupport');
+            
+            if (gl) {
+                webglSupport.textContent = 'Supported';
+                webglSupport.style.color = 'var(--color-success)';
+            } else {
+                webglSupport.textContent = 'Not Supported';
+                webglSupport.style.color = 'var(--color-danger)';
+            }
+        });
+    </script>
+</body>
+</html>
