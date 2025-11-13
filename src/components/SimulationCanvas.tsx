@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useCallback, useMemo } from 'react';
-import { useSimulationStore } from '@/stores/simulationStore';
-import { GRID_SIZE, POLLUTANT_TYPES, PollutionSource } from '@/types';
-import { FluidDynamics } from '@/physics/FluidDynamics';
+import { useSimulationStore } from '../stores/simulationStore';
+import { GRID_SIZE, POLLUTANT_TYPES, PollutionSource } from '../types';
+import { FluidDynamics } from '../physics/FluidDynamics';
 
 export const SimulationCanvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);

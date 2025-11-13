@@ -1,6 +1,6 @@
 import React from 'react';
-import { useSimulationStore } from '@/stores/simulationStore';
-import { POLLUTANT_TYPES, GRID_SIZE } from '@/types';
+import { useSimulationStore } from '../stores/simulationStore';
+import { POLLUTANT_TYPES, GRID_SIZE } from '../types';
 import { Play, Pause, RotateCcw, Wind, Waves, Droplets, Plus, Trash2 } from 'lucide-react';
 
 export const ControlPanel: React.FC = () => {

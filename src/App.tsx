@@ -1,8 +1,8 @@
 import React from 'react';
-import { SimulationCanvas } from '@/components/SimulationCanvas';
-import { ControlPanel } from '@/components/ControlPanel';
-import { Header } from '@/components/Header';
-import { StatusBar } from '@/components/StatusBar';
+import { SimulationCanvas } from './components/SimulationCanvas';
+import { ControlPanel } from './components/ControlPanel';
+import { Header } from './components/Header';
+import { StatusBar } from './components/StatusBar';
 
 const App: React.FC = () => {
   return (

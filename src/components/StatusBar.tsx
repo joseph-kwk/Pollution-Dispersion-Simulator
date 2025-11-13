@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useSimulationStore } from '@/stores/simulationStore';
-import { WebGLSimulationEngine } from '@/physics/WebGLSimulationEngine';
+import { useSimulationStore } from '../stores/simulationStore';
+import { WebGLSimulationEngine } from '../physics/WebGLSimulationEngine';
 
 export const StatusBar: React.FC = () => {
   const { fps, gpuEnabled, isRunning } = useSimulationStore();

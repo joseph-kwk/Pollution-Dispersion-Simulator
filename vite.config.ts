@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import path from 'path';
 
 export default defineConfig({
   root: '.',
@@ -32,7 +33,7 @@ export default defineConfig({
     }
   },
   optimizeDeps: {
-    include: ['three', 'zustand']
+    include: ['three', 'zustand', 'lucide-react']
   },
   define: {
     __VERSION__: JSON.stringify(process.env.npm_package_version),
@@ -44,7 +45,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': '/src'
+      '@': path.resolve(__dirname, './src')
     }
   }
 });

@@ -1,4 +1,4 @@
-import { GRID_SIZE, SimulationParameters, PollutionSource } from '@/types';
+import { GRID_SIZE, SimulationParameters, PollutionSource } from '../types';
 
 export class WebGLSimulationEngine {
   private canvas: HTMLCanvasElement;

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { SimulationState, SimulationParameters, PollutionSource, GRID_SIZE } from '@/types';
+import { SimulationState, SimulationParameters, PollutionSource, GRID_SIZE } from '../types';
 
 interface SimulationStore extends SimulationState {
   actions: {
