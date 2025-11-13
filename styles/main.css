@@ -850,13 +850,36 @@ canvas:hover {
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.3);
 }
 
-/* Reduced motion support */
-@media (prefers-reduced-motion: reduce) {
-    * {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-    }
+/* Source Items */
+.source-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--bg-glass);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--spacing-xs);
+    backdrop-filter: blur(10px);
+}
+
+.source-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: var(--font-size-xs);
+    color: var(--text-secondary);
+}
+
+.source-info span:first-child {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.btn-sm {
+    padding: var(--spacing-xs);
+    min-height: 28px;
+    font-size: var(--font-size-xs);
 }
 
 /* Responsive Layout Optimizations */

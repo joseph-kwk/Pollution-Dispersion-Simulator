@@ -1,10 +1,14 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useMemo } from 'react';
 import { useSimulationStore } from '@/stores/simulationStore';
 import { GRID_SIZE, POLLUTANT_TYPES, PollutionSource } from '@/types';
+import { FluidDynamics } from '@/physics/FluidDynamics';
 
 export const SimulationCanvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { grid, sources, parameters, isRunning, actions } = useSimulationStore();
+  const { grid, sources, parameters, isRunning, obstacles, actions } = useSimulationStore();
+
+  // Initialize fluid dynamics engine
+  const fluidDynamics = useMemo(() => new FluidDynamics(), []);
 
   // Color mapping function
   const getColorForDensity = useCallback((density: number, type: keyof typeof POLLUTANT_TYPES = 'CHEMICAL') => {
@@ -46,8 +50,26 @@ export const SimulationCanvas: React.FC = () => {
     for (let r = 0; r < GRID_SIZE; r++) {
       for (let c = 0; c < GRID_SIZE; c++) {
         const density = grid[r][c];
-        if (density > 0) {
-          ctx.fillStyle = getColorForDensity(density, sources[0]?.type);
+        if (obstacles[r][c]) {
+          // Draw obstacles
+          ctx.fillStyle = '#666';
+          ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
+        } else if (density > 0) {
+          // Use the type of the nearest active source for coloring
+          let nearestType: keyof typeof POLLUTANT_TYPES = 'CHEMICAL';
+          let minDistance = Infinity;
+
+          sources.forEach(source => {
+            if (source.active) {
+              const distance = Math.sqrt((source.x - c) ** 2 + (source.y - r) ** 2);
+              if (distance < minDistance) {
+                minDistance = distance;
+                nearestType = source.type;
+              }
+            }
+          });
+
+          ctx.fillStyle = getColorForDensity(density, nearestType);
           ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
         }
       }
@@ -68,7 +90,7 @@ export const SimulationCanvas: React.FC = () => {
         ctx.fill();
       }
     });
-  }, [grid, sources, getColorForDensity]);
+  }, [grid, sources, getColorForDensity, obstacles]);
 
   // Resize canvas
   const resizeCanvas = useCallback(() => {
@@ -84,7 +106,7 @@ export const SimulationCanvas: React.FC = () => {
     draw();
   }, [draw]);
 
-  // Handle canvas click for setting source
+  // Handle canvas click for setting source or obstacle
   const handleCanvasClick = useCallback((event: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -98,71 +120,53 @@ export const SimulationCanvas: React.FC = () => {
     const gridX = Math.floor(x / (canvas.width / GRID_SIZE));
     const gridY = Math.floor(y / (canvas.height / GRID_SIZE));
 
-    // Update first source position
-    actions.removeSource(0);
-    actions.addSource({
-      x: gridX,
-      y: gridY,
-      type: sources[0]?.type || 'CHEMICAL'
-    });
-  }, [actions, sources]);
+    if (event.ctrlKey) {
+      // Ctrl+click to toggle obstacle
+      const newObstacles = obstacles.map((row, r) =>
+        row.map((cell, c) => (r === gridY && c === gridX) ? !cell : cell)
+      );
+      actions.setObstacles(newObstacles);
+    } else {
+      // Regular click to move the first inactive source or add a new one
+      const inactiveSourceIndex = sources.findIndex(source => !source.active);
+      if (inactiveSourceIndex !== -1) {
+        // Activate and move an inactive source
+        actions.removeSource(inactiveSourceIndex);
+        actions.addSource({
+          x: gridX,
+          y: gridY,
+          type: sources[inactiveSourceIndex]?.type || 'CHEMICAL'
+        });
+      } else {
+        // Add a new source
+        actions.addSource({
+          x: gridX,
+          y: gridY,
+          type: 'CHEMICAL'
+        });
+      }
+    }
+  }, [actions, sources, obstacles]);
 
-  // Simulation step (simplified for now)
+  // Simulation step using fluid dynamics
   const simulateStep = useCallback(() => {
     if (!isRunning) return;
-
-    const newGrid = grid.map((row: number[]) => [...row]);
 
     // Add pollution at sources
     sources.forEach((source: PollutionSource) => {
       if (source.active && source.x >= 0 && source.y >= 0 &&
           source.x < GRID_SIZE && source.y < GRID_SIZE) {
-        newGrid[source.y][source.x] += parameters.releaseRate;
+        fluidDynamics.addDensitySource(source.x, source.y, parameters.releaseRate);
       }
     });
 
-    // Simple advection and diffusion
-    const windAngleRad = (parameters.windDirection * Math.PI) / 180;
-    const windVelX = parameters.windSpeed * Math.cos(windAngleRad);
-    const windVelY = parameters.windSpeed * Math.sin(windAngleRad);
+    // Step the fluid dynamics simulation
+    fluidDynamics.step(parameters);
 
-    for (let r = 0; r < GRID_SIZE; r++) {
-      for (let c = 0; c < GRID_SIZE; c++) {
-        if (newGrid[r][c] > 0) {
-          // Simple advection
-          const newR = Math.max(0, Math.min(GRID_SIZE - 1, r + windVelY));
-          const newC = Math.max(0, Math.min(GRID_SIZE - 1, c + windVelX));
-
-          // Simple diffusion
-          const diffused = newGrid[r][c] * parameters.diffusionRate;
-          newGrid[r][c] -= diffused;
-
-          // Distribute to neighbors
-          const neighbors = [
-            [Math.floor(newR), Math.floor(newC)],
-            [Math.floor(newR), Math.ceil(newC)],
-            [Math.ceil(newR), Math.floor(newC)],
-            [Math.ceil(newR), Math.ceil(newC)]
-          ];
-
-          neighbors.forEach(([nr, nc]) => {
-            if (nr >= 0 && nr < GRID_SIZE && nc >= 0 && nc < GRID_SIZE) {
-              newGrid[nr][nc] += diffused / neighbors.length;
-            }
-          });
-        }
-      }
-    }
-
-    // Apply decay
-    for (let r = 0; r < GRID_SIZE; r++) {
-      for (let c = 0; c < GRID_SIZE; c++) {
-        newGrid[r][c] = Math.min(255, Math.max(0, newGrid[r][c] * parameters.decayFactor));
-      }
-    }
-
+    // Update the store with the new density grid
+    const newGrid = fluidDynamics.getDensity();
     actions.setGrid(newGrid);
-  }, [grid, sources, parameters, isRunning, actions]);
+  }, [isRunning, sources, parameters, actions, fluidDynamics]);
 
   // Animation loop
   useEffect(() => {
@@ -185,6 +189,18 @@ export const SimulationCanvas: React.FC = () => {
     return () => window.removeEventListener('resize', resizeCanvas);
   }, [resizeCanvas]);
 
+  // Sync obstacles with fluid dynamics
+  useEffect(() => {
+    fluidDynamics.setObstacles(obstacles);
+  }, [fluidDynamics, obstacles]);
+
+  // Reset fluid dynamics when simulation resets
+  useEffect(() => {
+    if (!isRunning) {
+      fluidDynamics.reset();
+    }
+  }, [fluidDynamics, isRunning]);
+
   // Redraw when grid changes
   useEffect(() => {
     draw();
@@ -196,6 +212,7 @@ export const SimulationCanvas: React.FC = () => {
       className="simulation-canvas"
       onClick={handleCanvasClick}
       style={{ cursor: 'crosshair' }}
+      title="Click to place pollution source, Ctrl+Click to toggle obstacle"
     />
   );
 };

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useSimulationStore } from '@/stores/simulationStore';
 import { POLLUTANT_TYPES, GRID_SIZE } from '@/types';
-import { Play, Pause, RotateCcw, Wind, Waves, Droplets } from 'lucide-react';
+import { Play, Pause, RotateCcw, Wind, Waves, Droplets, Plus, Trash2 } from 'lucide-react';
 
 export const ControlPanel: React.FC = () => {
   const { isRunning, parameters, sources, gpuEnabled, actions } = useSimulationStore();
@@ -83,6 +83,40 @@ export const ControlPanel: React.FC = () => {
               ))}
             </select>
           </div>
+        </div>
+
+        {/* Pollution Sources */}
+        <div className="control-group">
+          <label className="control-label">
+            Pollution Sources ({sources.length})
+          </label>
+          <button
+            className="btn btn-secondary ripple scale-hover"
+            onClick={() => actions.addSource({
+              x: Math.floor(GRID_SIZE / 2),
+              y: Math.floor(GRID_SIZE / 2),
+              type: 'CHEMICAL'
+            })}
+            style={{ width: '100%', marginBottom: '8px' }}
+          >
+            <Plus style={{ width: '14px', height: '14px', marginRight: '4px' }} />
+            Add Source
+          </button>
+          {sources.map((source, index) => (
+            <div key={index} className="source-item">
+              <div className="source-info">
+                <span>Source {index + 1}: {POLLUTANT_TYPES[source.type].name}</span>
+                <span>({source.x}, {source.y})</span>
+              </div>
+              <button
+                className="btn btn-danger btn-sm"
+                onClick={() => actions.removeSource(index)}
+                disabled={sources.length === 1}
+              >
+                <Trash2 style={{ width: '12px', height: '12px' }} />
+              </button>
+            </div>
+          ))}
         </div>
       </div>
 
