@@ -50,9 +50,9 @@ export class FluidDynamics {
     this.obstacles = Array(size).fill(0).map(() => Array(size).fill(false));
   }
 
-  // Set obstacles
-  setObstacles(obstacles: boolean[][]): void {
-    this.obstacles = obstacles.map(row => [...row]);
+  // Toggle GPU acceleration
+  setGPUEnabled(enabled: boolean): void {
+    this.useGPU = enabled && this.gpuEngine !== null;
   }
 
   // Set density field (pollution)

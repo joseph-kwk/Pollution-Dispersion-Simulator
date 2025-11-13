@@ -186,6 +186,11 @@ export const SimulationCanvas: React.FC = () => {
     fluidDynamics.setObstacles(obstacles);
   }, [fluidDynamics, obstacles]);
 
+  // Sync GPU enabled state with fluid dynamics
+  useEffect(() => {
+    fluidDynamics.setGPUEnabled(gpuEnabled);
+  }, [fluidDynamics, gpuEnabled]);
+
   // Reset fluid dynamics when simulation resets
   useEffect(() => {
     if (!isRunning) {

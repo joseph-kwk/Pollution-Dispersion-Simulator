@@ -22,8 +22,8 @@ export const ControlPanel: React.FC = () => {
               {gpuEnabled ? 'GPU: Enabled' : 'GPU: Disabled'}
             </div>
           </div>
-          <div className="toggle-switch" onClick={actions.toggleGPU}>
-            <div className={`toggle-thumb ${gpuEnabled ? 'active' : ''}`}></div>
+          <div className={`toggle-switch ${gpuEnabled ? 'active' : ''}`} onClick={actions.toggleGPU}>
+            <div className="toggle-thumb"></div>
           </div>
         </div>
       </div>
