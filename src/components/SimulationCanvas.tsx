@@ -5,7 +5,7 @@ import { FluidDynamics } from '../physics/FluidDynamics';
 
 export const SimulationCanvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { grid, sources, parameters, isRunning, obstacles, actions } = useSimulationStore();
+  const { grid, sources, parameters, isRunning, obstacles, gpuEnabled, actions } = useSimulationStore();
 
   // Initialize fluid dynamics engine
   const fluidDynamics = useMemo(() => new FluidDynamics(GRID_SIZE, canvasRef.current || undefined), []);
