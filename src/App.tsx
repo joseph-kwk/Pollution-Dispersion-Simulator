@@ -4,6 +4,7 @@ import { ControlPanel } from './components/ControlPanel';
 import { Header } from './components/Header';
 import { StatusBar } from './components/StatusBar';
 import { SimulationCommentary } from './components/SimulationCommentary';
+import { PollutionInsights } from './components/PollutionInsights';
 
 const App: React.FC = () => {
   return (
@@ -11,6 +12,7 @@ const App: React.FC = () => {
       <Header />
       <aside className="sidebar">
         <ControlPanel />
+        <PollutionInsights />
       </aside>
       <main className="app-main">
         <SimulationCommentary />

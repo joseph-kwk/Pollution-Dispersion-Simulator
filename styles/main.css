@@ -1001,6 +1001,207 @@ canvas:hover {
     }
 }
 
+/* Pollution Insights Panel */
+.pollution-insights {
+    padding: var(--spacing-lg);
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-glass);
+    backdrop-filter: blur(20px);
+}
+
+.insights-header {
+    margin-bottom: var(--spacing-md);
+}
+
+.insights-title {
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    color: var(--text-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Air Quality Index Display */
+.aqi-display {
+    background: var(--bg-glass);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+    text-align: center;
+}
+
+.aqi-label {
+    font-size: var(--font-size-xs);
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: var(--spacing-xs);
+}
+
+.aqi-value {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-xs);
+}
+
+.aqi-number {
+    font-size: 2.5rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.aqi-icon {
+    font-size: 1.5rem;
+}
+
+.aqi-category {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    margin-bottom: var(--spacing-sm);
+}
+
+.aqi-bar {
+    height: 8px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+}
+
+.aqi-fill {
+    height: 100%;
+    transition: width 0.5s ease, background-color 0.5s ease;
+    border-radius: var(--radius-full);
+}
+
+/* Pollutant Insights */
+.pollutant-insights {
+    background: var(--bg-glass);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.pollutant-name {
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-sm);
+}
+
+.insight-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+}
+
+.insight-item {
+    background: var(--bg-tertiary);
+    padding: var(--spacing-sm);
+    border-radius: var(--radius-sm);
+}
+
+.insight-label {
+    font-size: var(--font-size-xs);
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--spacing-xs);
+}
+
+.insight-value {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.insight-value.clean {
+    color: var(--color-success);
+}
+
+.insight-value.polluted {
+    color: var(--color-danger);
+}
+
+/* Description Sections */
+.insight-description {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.description-section {
+    display: flex;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    background: rgba(59, 130, 246, 0.05);
+    border-left: 2px solid var(--color-primary);
+    border-radius: var(--radius-sm);
+}
+
+.section-icon {
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.section-content {
+    flex: 1;
+}
+
+.section-label {
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.section-text {
+    font-size: var(--font-size-xs);
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+/* Color Legend */
+.color-legend {
+    background: var(--bg-glass);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md);
+}
+
+.legend-title {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-sm);
+}
+
+.legend-items {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: var(--font-size-xs);
+    color: var(--text-secondary);
+}
+
+.legend-color {
+    width: 40px;
+    height: 16px;
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+    border: 1px solid var(--border-color);
+}
+
 @media (max-width: 1200px) {
     :root {
         --sidebar-width: 300px;

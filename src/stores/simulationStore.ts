@@ -17,12 +17,12 @@ interface SimulationStore extends SimulationState {
 }
 
 const initialParameters: SimulationParameters = {
-  windDirection: 0,
-  windSpeed: 0.5,
-  diffusionRate: 0.1,
-  releaseRate: 10,
+  windDirection: 90,
+  windSpeed: 0.8,
+  diffusionRate: 0.15,
+  releaseRate: 20,
   viscosity: 1.0,
-  decayFactor: 0.995
+  decayFactor: 0.992
 };
 
 const createInitialGrid = (): number[][] =>
@@ -55,6 +55,7 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
       isRunning: false,
       grid: createInitialGrid(),
       obstacles: createInitialObstacles(),
+      parameters: initialParameters,
       sources: [{
         x: Math.floor(GRID_SIZE / 2),
         y: Math.floor(GRID_SIZE / 2),
