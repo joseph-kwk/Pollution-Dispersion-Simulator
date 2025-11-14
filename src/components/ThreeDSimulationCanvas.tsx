@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useSimulationStore } from '../stores/simulationStore';
 import { GRID_SIZE, PollutionSource } from '../types';
 import { FluidDynamics } from '../physics/FluidDynamics';
@@ -6,6 +6,15 @@ import * as THREE from 'three';
 
 const PARTICLE_COUNT = 5000;
 const PARTICLE_SIZE = 0.15;
+
+const getAQIEmoji = (aqi: number) => {
+  if (aqi <= 50) return { emoji: '😊', label: 'Good', color: '#10b981' };
+  if (aqi <= 100) return { emoji: '😐', label: 'Moderate', color: '#f59e0b' };
+  if (aqi <= 150) return { emoji: '😷', label: 'Unhealthy', color: '#f97316' };
+  if (aqi <= 200) return { emoji: '😨', label: 'Very Unhealthy', color: '#ef4444' };
+  if (aqi <= 300) return { emoji: '☠️', label: 'Hazardous', color: '#991b1b' };
+  return { emoji: '💀', label: 'Severe', color: '#7f1d1d' };
+};
 
 export const ThreeDSimulationCanvas: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -17,6 +26,7 @@ export const ThreeDSimulationCanvas: React.FC = () => {
   const animationFrameRef = useRef<number | null>(null);
 
   const { sources, parameters, isRunning, obstacles, gpuEnabled, actions } = useSimulationStore();
+  const [currentAQI, setCurrentAQI] = useState(0);
 
   const initThreeJS = useCallback(() => {
     if (!containerRef.current) return;
@@ -252,6 +262,11 @@ export const ThreeDSimulationCanvas: React.FC = () => {
       const avgDensity = totalDensity / cellCount;
       const normalizedAvg = Math.min(avgDensity / 255, 1.0);
       
+      // Calculate AQI for emoji display - more sensitive to pollution changes
+      // Map average density directly to AQI scale (0-500)
+      const aqi = Math.min(500, Math.floor(avgDensity * 2));
+      setCurrentAQI(aqi);
+      
       // Interpolate background from clean (dark blue) to polluted (murky brown/red)
       const cleanR = 0x0a / 255, cleanG = 0x0a / 255, cleanB = 0x1a / 255;
       const pollutedR = 0x3a / 255, pollutedG = 0x1a / 255, pollutedB = 0x1a / 255;
@@ -323,8 +338,11 @@ export const ThreeDSimulationCanvas: React.FC = () => {
   useEffect(() => {
     if (!isRunning && fluidDynamicsRef.current) {
       fluidDynamicsRef.current.reset();
+      setCurrentAQI(0);
     }
   }, [isRunning]);
+
+  const aqiInfo = getAQIEmoji(currentAQI);
 
   return (
     <div
@@ -335,6 +353,24 @@ export const ThreeDSimulationCanvas: React.FC = () => {
         position: 'relative',
         background: 'linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 100%)',
       }}
-    />
+    >
+      {/* Air Quality Emoji Overlay */}
+      {isRunning && (
+        <div className="canvas-aqi-indicator">
+          <div className="canvas-aqi-emoji" style={{ 
+            fontSize: '3rem',
+            filter: `drop-shadow(0 0 10px ${aqiInfo.color})`
+          }}>
+            {aqiInfo.emoji}
+          </div>
+          <div className="canvas-aqi-label" style={{ color: aqiInfo.color }}>
+            {aqiInfo.label}
+          </div>
+          <div className="canvas-aqi-value" style={{ color: aqiInfo.color }}>
+            AQI: {currentAQI}
+          </div>
+        </div>
+      )}
+    </div>
   );
 };

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useSimulationStore } from '../stores/simulationStore';
 import { POLLUTANT_TYPES, SimulationParameters } from '../types';
+import { useNavigate } from 'react-router-dom';
 
 interface CaseStudy {
   id: string;
@@ -177,29 +178,39 @@ const getSeverityColor = (severity: string) => {
 
 export const CaseStudies: React.FC = () => {
   const actions = useSimulationStore((state) => state.actions);
+  const navigate = useNavigate();
+  const [loadingStudy, setLoadingStudy] = useState<string | null>(null);
 
   const loadCaseStudy = (caseStudy: CaseStudy) => {
+    setLoadingStudy(caseStudy.id);
+    
     // Reset first
     actions.reset();
     
-    // Clear existing sources
-    const currentSources = useSimulationStore.getState().sources;
-    currentSources.forEach((_, index) => {
-      actions.removeSource(index);
-    });
-
-    // Update parameters
-    actions.updateParameters(caseStudy.parameters);
-
-    // Add new sources
-    caseStudy.sourceConfig.forEach(source => {
-      actions.addSource(source);
-    });
-
-    // Start simulation
+    // Small delay for visual feedback
     setTimeout(() => {
-      actions.start();
-    }, 100);
+      // Clear existing sources
+      const currentSources = useSimulationStore.getState().sources;
+      currentSources.forEach((_, index) => {
+        actions.removeSource(index);
+      });
+
+      // Update parameters
+      actions.updateParameters(caseStudy.parameters);
+
+      // Add new sources
+      caseStudy.sourceConfig.forEach(source => {
+        actions.addSource(source);
+      });
+
+      // Navigate to simulator and start
+      navigate('/');
+      
+      setTimeout(() => {
+        actions.start();
+        setLoadingStudy(null);
+      }, 200);
+    }, 300);
   };
 
   return (
@@ -283,8 +294,9 @@ export const CaseStudies: React.FC = () => {
             <button 
               className="load-case-study-btn"
               onClick={() => loadCaseStudy(study)}
+              disabled={loadingStudy === study.id}
             >
-              Load Scenario →
+              {loadingStudy === study.id ? '⏳ Loading...' : '▶ Load & Run Scenario'}
             </button>
           </div>
         ))}
