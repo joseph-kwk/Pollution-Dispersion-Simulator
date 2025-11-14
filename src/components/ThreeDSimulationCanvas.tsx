@@ -94,9 +94,10 @@ export const ThreeDSimulationCanvas: React.FC = () => {
       size: PARTICLE_SIZE,
       vertexColors: true,
       transparent: true,
-      opacity: 0.8,
+      opacity: 0.9,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
+      sizeAttenuation: true,
     });
 
     const particles = new THREE.Points(geometry, material);
@@ -172,13 +173,49 @@ export const ThreeDSimulationCanvas: React.FC = () => {
         density = grid[gridZ][gridX];
       }
 
-      // Color based on density
+      // Color based on density and pollutant type
       const normalizedDensity = Math.min(density / 255, 1.0);
       
-      // Interpolate from light blue (clean) to red (polluted)
-      colors[i3] = 0.7 + (0.8 - 0.7) * normalizedDensity; // Red channel
-      colors[i3 + 1] = 0.8 * (1 - normalizedDensity); // Green channel
-      colors[i3 + 2] = 1.0 * (1 - normalizedDensity); // Blue channel
+      // Determine dominant pollutant type at this location
+      let dominantType = sources.length > 0 ? sources[0].type : 'CHEMICAL';
+      if (sources.length > 1) {
+        // Find closest source
+        let minDist = Infinity;
+        sources.forEach(source => {
+          const dx = positions[i3] - (source.x - halfGrid);
+          const dz = positions[i3 + 2] - (source.y - halfGrid);
+          const dist = dx * dx + dz * dz;
+          if (dist < minDist) {
+            minDist = dist;
+            dominantType = source.type;
+          }
+        });
+      }
+
+      // Get base color from pollutant type
+      let baseR = 0.5, baseG = 0.7, baseB = 1.0; // Default: clean air (light blue)
+      
+      if (normalizedDensity > 0.05) { // Only colorize if there's significant pollution
+        switch (dominantType) {
+          case 'CHEMICAL':
+            baseR = 139 / 255; baseG = 0; baseB = 0; // Dark red
+            break;
+          case 'OIL':
+            baseR = 47 / 255; baseG = 79 / 255; baseB = 79 / 255; // Dark teal
+            break;
+          case 'SEWAGE':
+            baseR = 101 / 255; baseG = 67 / 255; baseB = 33 / 255; // Brown
+            break;
+          case 'THERMAL':
+            baseR = 255 / 255; baseG = 140 / 255; baseB = 0; // Orange
+            break;
+        }
+      }
+      
+      // Interpolate from clean air (light blue) to pollutant color based on density
+      colors[i3] = baseR * normalizedDensity + 0.5 * (1 - normalizedDensity); // Red
+      colors[i3 + 1] = baseG * normalizedDensity + 0.7 * (1 - normalizedDensity); // Green
+      colors[i3 + 2] = baseB * normalizedDensity + 1.0 * (1 - normalizedDensity); // Blue
 
       // Wrap around boundaries
       if (positions[i3] < -halfGrid) positions[i3] = halfGrid;
@@ -201,6 +238,34 @@ export const ThreeDSimulationCanvas: React.FC = () => {
       
       // Update particles based on simulation
       updateParticles();
+
+      // Update scene background based on average pollution level
+      const grid = fluidDynamicsRef.current.getDensity();
+      let totalDensity = 0;
+      let cellCount = 0;
+      for (let i = 0; i < GRID_SIZE; i++) {
+        for (let j = 0; j < GRID_SIZE; j++) {
+          totalDensity += grid[i][j];
+          cellCount++;
+        }
+      }
+      const avgDensity = totalDensity / cellCount;
+      const normalizedAvg = Math.min(avgDensity / 255, 1.0);
+      
+      // Interpolate background from clean (dark blue) to polluted (murky brown/red)
+      const cleanR = 0x0a / 255, cleanG = 0x0a / 255, cleanB = 0x1a / 255;
+      const pollutedR = 0x3a / 255, pollutedG = 0x1a / 255, pollutedB = 0x1a / 255;
+      
+      const bgR = cleanR * (1 - normalizedAvg) + pollutedR * normalizedAvg;
+      const bgG = cleanG * (1 - normalizedAvg) + pollutedG * normalizedAvg;
+      const bgB = cleanB * (1 - normalizedAvg) + pollutedB * normalizedAvg;
+      
+      sceneRef.current.background = new THREE.Color(bgR, bgG, bgB);
+      sceneRef.current.fog = new THREE.Fog(
+        new THREE.Color(bgR, bgG, bgB).getHex(),
+        10,
+        50
+      );
 
       // Rotate camera slightly for better view
       const time = Date.now() * 0.0001;

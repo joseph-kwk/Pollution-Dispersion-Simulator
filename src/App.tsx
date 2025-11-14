@@ -1,27 +1,46 @@
 import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThreeDSimulationCanvas } from './components/ThreeDSimulationCanvas';
 import { ControlPanel } from './components/ControlPanel';
 import { Header } from './components/Header';
 import { StatusBar } from './components/StatusBar';
 import { SimulationCommentary } from './components/SimulationCommentary';
 import { PollutionInsights } from './components/PollutionInsights';
+import { CaseStudies } from './components/CaseStudies';
+
+const SimulatorPage: React.FC = () => (
+  <>
+    <aside className="sidebar">
+      <ControlPanel />
+      <PollutionInsights />
+    </aside>
+    <main className="app-main">
+      <SimulationCommentary />
+      <div className="simulation-container">
+        <ThreeDSimulationCanvas />
+      </div>
+    </main>
+  </>
+);
+
+const CaseStudiesPage: React.FC = () => (
+  <main className="app-main case-studies-page">
+    <CaseStudies />
+  </main>
+);
 
 const App: React.FC = () => {
   return (
-    <div className="app">
-      <Header />
-      <aside className="sidebar">
-        <ControlPanel />
-        <PollutionInsights />
-      </aside>
-      <main className="app-main">
-        <SimulationCommentary />
-        <div className="simulation-container">
-          <ThreeDSimulationCanvas />
-        </div>
-      </main>
-      <StatusBar />
-    </div>
+    <BrowserRouter>
+      <div className="app">
+        <Header />
+        <Routes>
+          <Route path="/" element={<SimulatorPage />} />
+          <Route path="/case-studies" element={<CaseStudiesPage />} />
+        </Routes>
+        <StatusBar />
+      </div>
+    </BrowserRouter>
   );
 };
 
