@@ -1,8 +1,9 @@
 import React from 'react';
-import { SimulationCanvas } from './components/SimulationCanvas';
+import { ThreeDSimulationCanvas } from './components/ThreeDSimulationCanvas';
 import { ControlPanel } from './components/ControlPanel';
 import { Header } from './components/Header';
 import { StatusBar } from './components/StatusBar';
+import { SimulationCommentary } from './components/SimulationCommentary';
 
 const App: React.FC = () => {
   return (
@@ -12,8 +13,9 @@ const App: React.FC = () => {
         <ControlPanel />
       </aside>
       <main className="app-main">
+        <SimulationCommentary />
         <div className="simulation-container">
-          <SimulationCanvas />
+          <ThreeDSimulationCanvas />
         </div>
       </main>
       <StatusBar />

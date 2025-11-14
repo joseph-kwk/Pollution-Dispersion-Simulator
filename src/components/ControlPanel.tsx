@@ -34,12 +34,13 @@ export const ControlPanel: React.FC = () => {
 
         <div className="btn-group">
           <button
-            className="btn btn-primary ripple scale-hover"
+            className={`btn ${isRunning ? 'btn-success' : 'btn-primary'} ripple scale-hover`}
             onClick={actions.start}
             disabled={isRunning}
+            style={isRunning ? { opacity: 0.6 } : {}}
           >
             <Play style={{ width: '16px', height: '16px' }} />
-            Start
+            {isRunning ? 'Running...' : 'Start'}
           </button>
           <button
             className="btn btn-secondary ripple scale-hover"

@@ -2,40 +2,18 @@ import React, { useRef, useEffect, useCallback, useMemo } from 'react';
 import { useSimulationStore } from '../stores/simulationStore';
 import { GRID_SIZE, POLLUTANT_TYPES, PollutionSource } from '../types';
 import { FluidDynamics } from '../physics/FluidDynamics';
+import { WebGLRenderer } from '../physics/WebGLRenderer';
 
 export const SimulationCanvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const { grid, sources, parameters, isRunning, obstacles, gpuEnabled, actions } = useSimulationStore();
 
-  // Initialize fluid dynamics engine
-  const fluidDynamics = useMemo(() => new FluidDynamics(GRID_SIZE, canvasRef.current || undefined), []);
+  const fluidDynamics = useMemo(() => new FluidDynamics(GRID_SIZE), []);
+  const rendererRef = useRef<WebGLRenderer | null>(null);
 
-  // Color mapping function
-  const getColorForDensity = useCallback((density: number, type: keyof typeof POLLUTANT_TYPES = 'CHEMICAL') => {
-    const normalizedDensity = Math.min(1, Math.max(0, density / 255));
-    const pollutantType = POLLUTANT_TYPES[type];
-
-    // Base fluid color (light blue for water/air)
-    const baseR = 235;
-    const baseG = 245;
-    const baseB = 255;
-
-    if (normalizedDensity === 0) {
-      return `rgb(${baseR}, ${baseG}, ${baseB})`;
-    }
-
-    const pollutionColor = pollutantType.baseColor;
-
-    // Blend between base fluid color and pollution color based on density
-    const r = Math.floor(baseR + (pollutionColor.r - baseR) * normalizedDensity);
-    const g = Math.floor(baseG + (pollutionColor.g - baseG) * normalizedDensity);
-    const b = Math.floor(baseB + (pollutionColor.b - baseB) * normalizedDensity);
-    return `rgb(${r}, ${g}, ${b})`;
-  }, []);
-
-  // Draw function
-  const draw = useCallback(() => {
-    const canvas = canvasRef.current;
+  const drawOverlay = useCallback(() => {
+    const canvas = overlayCanvasRef.current;
     if (!canvas) return;
 
     const ctx = canvas.getContext('2d');
@@ -43,33 +21,14 @@ export const SimulationCanvas: React.FC = () => {
 
     const cellSize = canvas.width / GRID_SIZE;
 
-    // Clear canvas
+    // Clear overlay
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw grid
+    // Draw obstacles
+    ctx.fillStyle = '#666';
     for (let r = 0; r < GRID_SIZE; r++) {
       for (let c = 0; c < GRID_SIZE; c++) {
-        const density = grid[r][c];
         if (obstacles[r][c]) {
-          // Draw obstacles
-          ctx.fillStyle = '#666';
-          ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
-        } else if (density > 0) {
-          // Use the type of the nearest active source for coloring
-          let nearestType: keyof typeof POLLUTANT_TYPES = 'CHEMICAL';
-          let minDistance = Infinity;
-
-          sources.forEach(source => {
-            if (source.active) {
-              const distance = Math.sqrt((source.x - c) ** 2 + (source.y - r) ** 2);
-              if (distance < minDistance) {
-                minDistance = distance;
-                nearestType = source.type;
-              }
-            }
-          });
-
-          ctx.fillStyle = getColorForDensity(density, nearestType);
           ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
         }
       }
@@ -83,19 +42,34 @@ export const SimulationCanvas: React.FC = () => {
         ctx.arc(
           source.x * cellSize + cellSize / 2,
           source.y * cellSize + cellSize / 2,
-          cellSize / 3,
+          cellSize / 2,
           0,
           Math.PI * 2
         );
         ctx.fill();
+        
+        // Add a white border for visibility
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        ctx.stroke();
       }
     });
-  }, [grid, sources, getColorForDensity, obstacles]);
+  }, [sources, obstacles]);
 
-  // Resize canvas
+  const draw = useCallback(() => {
+    if (rendererRef.current) {
+      rendererRef.current.updateDensity(grid);
+      rendererRef.current.draw();
+    } else {
+      console.warn('WebGLRenderer not initialized yet');
+    }
+    drawOverlay();
+  }, [grid, drawOverlay]);
+
   const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const overlayCanvas = overlayCanvasRef.current;
+    if (!canvas || !overlayCanvas) return;
 
     const container = canvas.parentElement;
     if (!container) return;
@@ -103,12 +77,30 @@ export const SimulationCanvas: React.FC = () => {
     const size = Math.min(container.offsetWidth, container.offsetHeight);
     canvas.width = size;
     canvas.height = size;
+    overlayCanvas.width = size;
+    overlayCanvas.height = size;
+
+    if (rendererRef.current) {
+      rendererRef.current.resize();
+    }
     draw();
   }, [draw]);
 
-  // Handle canvas click for setting source or obstacle
+  useEffect(() => {
+    if (canvasRef.current && !rendererRef.current) {
+      try {
+        console.log('Initializing WebGLRenderer...');
+        rendererRef.current = new WebGLRenderer(canvasRef.current);
+        console.log('WebGLRenderer initialized successfully');
+        resizeCanvas();
+      } catch (error) {
+        console.error("Failed to initialize WebGLRenderer:", error);
+      }
+    }
+  }, [resizeCanvas]);
+
   const handleCanvasClick = useCallback((event: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
+    const canvas = overlayCanvasRef.current;
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
@@ -121,16 +113,13 @@ export const SimulationCanvas: React.FC = () => {
     const gridY = Math.floor(y / (canvas.height / GRID_SIZE));
 
     if (event.ctrlKey) {
-      // Ctrl+click to toggle obstacle
       const newObstacles = obstacles.map((row, r) =>
         row.map((cell, c) => (r === gridY && c === gridX) ? !cell : cell)
       );
       actions.setObstacles(newObstacles);
     } else {
-      // Regular click to move the first inactive source or add a new one
       const inactiveSourceIndex = sources.findIndex(source => !source.active);
       if (inactiveSourceIndex !== -1) {
-        // Activate and move an inactive source
         actions.removeSource(inactiveSourceIndex);
         actions.addSource({
           x: gridX,
@@ -138,7 +127,6 @@ export const SimulationCanvas: React.FC = () => {
           type: sources[inactiveSourceIndex]?.type || 'CHEMICAL'
         });
       } else {
-        // Add a new source
         actions.addSource({
           x: gridX,
           y: gridY,
@@ -148,19 +136,22 @@ export const SimulationCanvas: React.FC = () => {
     }
   }, [actions, sources, obstacles]);
 
-  // Simulation step using fluid dynamics
   const simulateStep = useCallback(() => {
     if (!isRunning) return;
 
-    // Step the fluid dynamics simulation
     fluidDynamics.step(parameters, sources);
-
-    // Update the store with the new density grid
     const newGrid = fluidDynamics.getDensity();
     actions.setGrid(newGrid);
+    
+    // Log density to verify simulation is working
+    const totalDensity = newGrid.reduce((sum, row) => 
+      sum + row.reduce((rowSum, cell) => rowSum + cell, 0), 0
+    );
+    if (totalDensity > 0) {
+      console.log('Simulation active - Total density:', totalDensity.toFixed(2));
+    }
   }, [isRunning, sources, parameters, actions, fluidDynamics]);
 
-  // Animation loop
   useEffect(() => {
     if (!isRunning) return;
 
@@ -174,42 +165,52 @@ export const SimulationCanvas: React.FC = () => {
     return () => cancelAnimationFrame(animationId);
   }, [isRunning, simulateStep, draw]);
 
-  // Initial setup
   useEffect(() => {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
     return () => window.removeEventListener('resize', resizeCanvas);
   }, [resizeCanvas]);
 
-  // Sync obstacles with fluid dynamics
   useEffect(() => {
     fluidDynamics.setObstacles(obstacles);
   }, [fluidDynamics, obstacles]);
 
-  // Sync GPU enabled state with fluid dynamics
   useEffect(() => {
     fluidDynamics.setGPUEnabled(gpuEnabled);
   }, [fluidDynamics, gpuEnabled]);
 
-  // Reset fluid dynamics when simulation resets
   useEffect(() => {
     if (!isRunning) {
       fluidDynamics.reset();
     }
   }, [fluidDynamics, isRunning]);
 
-  // Redraw when grid changes
   useEffect(() => {
     draw();
   }, [draw]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="simulation-canvas"
-      onClick={handleCanvasClick}
-      style={{ cursor: 'crosshair' }}
-      title="Click to place pollution source, Ctrl+Click to toggle obstacle"
-    />
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <canvas
+        ref={canvasRef}
+        className="simulation-canvas"
+        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+      />
+      <canvas
+        ref={overlayCanvasRef}
+        className="simulation-canvas"
+        onClick={handleCanvasClick}
+        style={{ 
+          position: 'absolute', 
+          top: 0, 
+          left: 0, 
+          width: '100%', 
+          height: '100%', 
+          cursor: 'crosshair',
+          pointerEvents: 'auto'
+        }}
+        title="Click to place pollution source, Ctrl+Click to toggle obstacle"
+      />
+    </div>
   );
 };

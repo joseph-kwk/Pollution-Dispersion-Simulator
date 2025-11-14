@@ -1,0 +1,275 @@
+import React, { useRef, useEffect, useCallback } from 'react';
+import { useSimulationStore } from '../stores/simulationStore';
+import { GRID_SIZE, PollutionSource } from '../types';
+import { FluidDynamics } from '../physics/FluidDynamics';
+import * as THREE from 'three';
+
+const PARTICLE_COUNT = 5000;
+const PARTICLE_SIZE = 0.15;
+
+export const ThreeDSimulationCanvas: React.FC = () => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const particlesRef = useRef<THREE.Points | null>(null);
+  const fluidDynamicsRef = useRef<FluidDynamics | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+
+  const { sources, parameters, isRunning, obstacles, gpuEnabled, actions } = useSimulationStore();
+
+  const initThreeJS = useCallback(() => {
+    if (!containerRef.current) return;
+
+    // Scene
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a0a1a);
+    scene.fog = new THREE.Fog(0x0a0a1a, 10, 50);
+    sceneRef.current = scene;
+
+    // Camera
+    const camera = new THREE.PerspectiveCamera(
+      60,
+      containerRef.current.clientWidth / containerRef.current.clientHeight,
+      0.1,
+      1000
+    );
+    camera.position.set(0, 15, 25);
+    camera.lookAt(0, 0, 0);
+    cameraRef.current = camera;
+
+    // Renderer
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    containerRef.current.appendChild(renderer.domElement);
+    rendererRef.current = renderer;
+
+    // Grid helper
+    const gridHelper = new THREE.GridHelper(GRID_SIZE, GRID_SIZE, 0x444444, 0x222222);
+    scene.add(gridHelper);
+
+    // Ambient light
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(ambientLight);
+
+    // Directional light
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(10, 20, 10);
+    scene.add(directionalLight);
+
+    // Create particles
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(PARTICLE_COUNT * 3);
+    const colors = new Float32Array(PARTICLE_COUNT * 3);
+    const velocities = new Float32Array(PARTICLE_COUNT * 3);
+    const lifetimes = new Float32Array(PARTICLE_COUNT);
+
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      const i3 = i * 3;
+      // Random initial positions
+      positions[i3] = (Math.random() - 0.5) * GRID_SIZE;
+      positions[i3 + 1] = Math.random() * 5;
+      positions[i3 + 2] = (Math.random() - 0.5) * GRID_SIZE;
+
+      // Initial colors (light blue)
+      colors[i3] = 0.7;
+      colors[i3 + 1] = 0.8;
+      colors[i3 + 2] = 1.0;
+
+      // Random velocities
+      velocities[i3] = (Math.random() - 0.5) * 0.1;
+      velocities[i3 + 1] = Math.random() * 0.05;
+      velocities[i3 + 2] = (Math.random() - 0.5) * 0.1;
+
+      lifetimes[i] = Math.random();
+    }
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geometry.setAttribute('velocity', new THREE.BufferAttribute(velocities, 3));
+    geometry.setAttribute('lifetime', new THREE.BufferAttribute(lifetimes, 1));
+
+    const material = new THREE.PointsMaterial({
+      size: PARTICLE_SIZE,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.8,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+
+    const particles = new THREE.Points(geometry, material);
+    scene.add(particles);
+    particlesRef.current = particles;
+
+    // Initialize fluid dynamics
+    fluidDynamicsRef.current = new FluidDynamics(GRID_SIZE);
+    fluidDynamicsRef.current.setGPUEnabled(gpuEnabled);
+
+    console.log('Three.js scene initialized with', PARTICLE_COUNT, 'particles');
+  }, [gpuEnabled]);
+
+  const updateParticles = useCallback(() => {
+    if (!particlesRef.current || !fluidDynamicsRef.current) return;
+
+    const positions = particlesRef.current.geometry.attributes.position.array as Float32Array;
+    const colors = particlesRef.current.geometry.attributes.color.array as Float32Array;
+    const velocities = particlesRef.current.geometry.attributes.velocity.array as Float32Array;
+    const lifetimes = particlesRef.current.geometry.attributes.lifetime.array as Float32Array;
+
+    const grid = fluidDynamicsRef.current.getDensity();
+    const halfGrid = GRID_SIZE / 2;
+
+    // Wind direction in radians
+    const windAngle = (parameters.windDirection * Math.PI) / 180;
+    const windVelX = parameters.windSpeed * Math.cos(windAngle) * 0.05;
+    const windVelZ = parameters.windSpeed * Math.sin(windAngle) * 0.05;
+
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      const i3 = i * 3;
+
+      // Update lifetime
+      lifetimes[i] += 0.01;
+      if (lifetimes[i] > 1.0) {
+        // Respawn particle at a pollution source
+        if (sources.length > 0) {
+          const source = sources[Math.floor(Math.random() * sources.length)];
+          positions[i3] = source.x - halfGrid + (Math.random() - 0.5) * 2;
+          positions[i3 + 1] = Math.random() * 3;
+          positions[i3 + 2] = source.y - halfGrid + (Math.random() - 0.5) * 2;
+          lifetimes[i] = 0;
+
+          // Reset velocity
+          velocities[i3] = windVelX;
+          velocities[i3 + 1] = 0.05 + Math.random() * 0.05;
+          velocities[i3 + 2] = windVelZ;
+        }
+      }
+
+      // Apply wind velocity
+      velocities[i3] += windVelX * 0.1;
+      velocities[i3 + 2] += windVelZ * 0.1;
+
+      // Update position
+      positions[i3] += velocities[i3];
+      positions[i3 + 1] += velocities[i3 + 1];
+      positions[i3 + 2] += velocities[i3 + 2];
+
+      // Apply turbulence
+      positions[i3] += (Math.random() - 0.5) * 0.05;
+      positions[i3 + 2] += (Math.random() - 0.5) * 0.05;
+
+      // Gravity effect
+      velocities[i3 + 1] -= 0.002;
+
+      // Get density at particle position
+      const gridX = Math.floor(positions[i3] + halfGrid);
+      const gridZ = Math.floor(positions[i3 + 2] + halfGrid);
+
+      let density = 0;
+      if (gridX >= 0 && gridX < GRID_SIZE && gridZ >= 0 && gridZ < GRID_SIZE) {
+        density = grid[gridZ][gridX];
+      }
+
+      // Color based on density
+      const normalizedDensity = Math.min(density / 255, 1.0);
+      
+      // Interpolate from light blue (clean) to red (polluted)
+      colors[i3] = 0.7 + (0.8 - 0.7) * normalizedDensity; // Red channel
+      colors[i3 + 1] = 0.8 * (1 - normalizedDensity); // Green channel
+      colors[i3 + 2] = 1.0 * (1 - normalizedDensity); // Blue channel
+
+      // Wrap around boundaries
+      if (positions[i3] < -halfGrid) positions[i3] = halfGrid;
+      if (positions[i3] > halfGrid) positions[i3] = -halfGrid;
+      if (positions[i3 + 2] < -halfGrid) positions[i3 + 2] = halfGrid;
+      if (positions[i3 + 2] > halfGrid) positions[i3 + 2] = -halfGrid;
+      if (positions[i3 + 1] < 0) positions[i3 + 1] = 10;
+    }
+
+    particlesRef.current.geometry.attributes.position.needsUpdate = true;
+    particlesRef.current.geometry.attributes.color.needsUpdate = true;
+  }, [sources, parameters]);
+
+  const animate = useCallback(() => {
+    if (!sceneRef.current || !cameraRef.current || !rendererRef.current) return;
+
+    if (isRunning && fluidDynamicsRef.current) {
+      // Run fluid dynamics simulation
+      fluidDynamicsRef.current.step(parameters, sources);
+      
+      // Update particles based on simulation
+      updateParticles();
+
+      // Rotate camera slightly for better view
+      const time = Date.now() * 0.0001;
+      cameraRef.current.position.x = Math.sin(time) * 30;
+      cameraRef.current.position.z = Math.cos(time) * 30;
+      cameraRef.current.lookAt(0, 0, 0);
+    }
+
+    rendererRef.current.render(sceneRef.current, cameraRef.current);
+    animationFrameRef.current = requestAnimationFrame(animate);
+  }, [isRunning, sources, parameters, updateParticles]);
+
+  const handleResize = useCallback(() => {
+    if (!containerRef.current || !cameraRef.current || !rendererRef.current) return;
+
+    const width = containerRef.current.clientWidth;
+    const height = containerRef.current.clientHeight;
+
+    cameraRef.current.aspect = width / height;
+    cameraRef.current.updateProjectionMatrix();
+    rendererRef.current.setSize(width, height);
+  }, []);
+
+  useEffect(() => {
+    initThreeJS();
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      if (rendererRef.current && containerRef.current) {
+        containerRef.current.removeChild(rendererRef.current.domElement);
+        rendererRef.current.dispose();
+      }
+    };
+  }, [initThreeJS, handleResize]);
+
+  useEffect(() => {
+    animate();
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [animate]);
+
+  useEffect(() => {
+    if (fluidDynamicsRef.current) {
+      fluidDynamicsRef.current.setGPUEnabled(gpuEnabled);
+    }
+  }, [gpuEnabled]);
+
+  useEffect(() => {
+    if (!isRunning && fluidDynamicsRef.current) {
+      fluidDynamicsRef.current.reset();
+    }
+  }, [isRunning]);
+
+  return (
+    <div
+      ref={containerRef}
+      style={{
+        width: '100%',
+        height: '100%',
+        position: 'relative',
+        background: 'linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 100%)',
+      }}
+    />
+  );
+};
