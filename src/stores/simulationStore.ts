@@ -11,8 +11,11 @@ interface SimulationStore extends SimulationState {
     removeSource: (index: number) => void;
     toggleGPU: () => void;
     toggleScientistMode: () => void;
+    toggleDrawingObstacles: () => void;
     setGrid: (grid: number[][]) => void;
     setObstacles: (obstacles: boolean[][]) => void;
+    addObstacle: (x: number, y: number) => void;
+    removeObstacle: (x: number, y: number) => void;
     setFPS: (fps: number) => void;
   };
 }
@@ -45,7 +48,8 @@ const initialState: SimulationState = {
   parameters: initialParameters,
   fps: 0,
   gpuEnabled: false,
-  scientistMode: false
+  scientistMode: false,
+  isDrawingObstacles: false
 };
 
 export const useSimulationStore = create<SimulationStore>((set) => ({
@@ -76,8 +80,23 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
     })),
     toggleGPU: () => set((state) => ({ gpuEnabled: !state.gpuEnabled })),
     toggleScientistMode: () => set((state) => ({ scientistMode: !state.scientistMode })),
+    toggleDrawingObstacles: () => set((state) => ({ isDrawingObstacles: !state.isDrawingObstacles })),
     setGrid: (grid) => set({ grid }),
     setObstacles: (obstacles) => set({ obstacles }),
+    addObstacle: (x, y) => set((state) => {
+      const newObstacles = state.obstacles.map(row => [...row]);
+      if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
+        newObstacles[y][x] = true;
+      }
+      return { obstacles: newObstacles };
+    }),
+    removeObstacle: (x, y) => set((state) => {
+      const newObstacles = state.obstacles.map(row => [...row]);
+      if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
+        newObstacles[y][x] = false;
+      }
+      return { obstacles: newObstacles };
+    }),
     setFPS: (fps) => set({ fps })
   }
 }));

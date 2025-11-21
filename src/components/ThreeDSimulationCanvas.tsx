@@ -24,10 +24,14 @@ export const ThreeDSimulationCanvas: React.FC = () => {
   const particlesRef = useRef<THREE.Points | null>(null);
   const gridHelperRef = useRef<THREE.GridHelper | null>(null);
   const vectorGroupRef = useRef<THREE.Group | null>(null);
+  const obstaclesGroupRef = useRef<THREE.Group | null>(null);
   const fluidDynamicsRef = useRef<FluidDynamics | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const raycasterRef = useRef<THREE.Raycaster>(new THREE.Raycaster());
+  const mouseRef = useRef<THREE.Vector2>(new THREE.Vector2());
+  const planeRef = useRef<THREE.Mesh | null>(null);
 
-  const { sources, parameters, isRunning, gpuEnabled, scientistMode } = useSimulationStore();
+  const { sources, parameters, isRunning, gpuEnabled, scientistMode, isDrawingObstacles, obstacles, actions } = useSimulationStore();
   const [currentAQI, setCurrentAQI] = useState(0);
 
   const initThreeJS = useCallback(() => {
@@ -68,6 +72,19 @@ export const ThreeDSimulationCanvas: React.FC = () => {
     vectorGroup.visible = scientistMode;
     scene.add(vectorGroup);
     vectorGroupRef.current = vectorGroup;
+
+    // Obstacles group
+    const obstaclesGroup = new THREE.Group();
+    scene.add(obstaclesGroup);
+    obstaclesGroupRef.current = obstaclesGroup;
+
+    // Interaction plane (invisible)
+    const planeGeometry = new THREE.PlaneGeometry(GRID_SIZE, GRID_SIZE);
+    const planeMaterial = new THREE.MeshBasicMaterial({ visible: false });
+    const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+    plane.rotation.x = -Math.PI / 2;
+    scene.add(plane);
+    planeRef.current = plane;
 
     // Ambient light
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
@@ -289,6 +306,72 @@ export const ThreeDSimulationCanvas: React.FC = () => {
       }
     }
   }, [scientistMode, parameters.windDirection, parameters.windSpeed]);
+
+  // Handle mouse interaction for drawing obstacles
+  useEffect(() => {
+    if (!containerRef.current || !cameraRef.current || !planeRef.current) return;
+
+    const handleMouseDown = (event: MouseEvent) => {
+      if (!isDrawingObstacles) return;
+
+      const rect = containerRef.current!.getBoundingClientRect();
+      mouseRef.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      mouseRef.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycasterRef.current.setFromCamera(mouseRef.current, cameraRef.current!);
+      const intersects = raycasterRef.current.intersectObject(planeRef.current!);
+
+      if (intersects.length > 0) {
+        const point = intersects[0].point;
+        const halfGrid = GRID_SIZE / 2;
+        const x = Math.floor(point.x + halfGrid);
+        const y = Math.floor(point.z + halfGrid);
+
+        if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
+          // Toggle obstacle
+          if (obstacles[y][x]) {
+            actions.removeObstacle(x, y);
+          } else {
+            actions.addObstacle(x, y);
+          }
+        }
+      }
+    };
+
+    containerRef.current.addEventListener('mousedown', handleMouseDown);
+    return () => {
+      containerRef.current?.removeEventListener('mousedown', handleMouseDown);
+    };
+  }, [isDrawingObstacles, obstacles, actions]);
+
+  // Update obstacle visuals
+  useEffect(() => {
+    if (!obstaclesGroupRef.current) return;
+
+    // Clear existing obstacles
+    while (obstaclesGroupRef.current.children.length > 0) {
+      obstaclesGroupRef.current.remove(obstaclesGroupRef.current.children[0]);
+    }
+
+    const geometry = new THREE.BoxGeometry(1, 5, 1);
+    const material = new THREE.MeshStandardMaterial({ color: 0x888888 });
+    const halfGrid = GRID_SIZE / 2;
+
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        if (obstacles[y][x]) {
+          const mesh = new THREE.Mesh(geometry, material);
+          mesh.position.set(x - halfGrid + 0.5, 2.5, y - halfGrid + 0.5);
+          obstaclesGroupRef.current.add(mesh);
+        }
+      }
+    }
+
+    // Update fluid dynamics engine
+    if (fluidDynamicsRef.current) {
+      fluidDynamicsRef.current.setObstacles(obstacles);
+    }
+  }, [obstacles]);
 
   const animate = useCallback(() => {
     if (!sceneRef.current || !cameraRef.current || !rendererRef.current) return;

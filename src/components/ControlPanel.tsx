@@ -1,10 +1,10 @@
 import React, { useRef } from 'react';
 import { useSimulationStore } from '../stores/simulationStore';
 import { POLLUTANT_TYPES, GRID_SIZE } from '../types';
-import { Play, Pause, RotateCcw, Wind, Waves, Droplets, Plus, Trash2, Download, Upload, FileJson } from 'lucide-react';
+import { Play, Pause, RotateCcw, Wind, Waves, Droplets, Plus, Trash2, Download, Upload, FileJson, Square } from 'lucide-react';
 
 export const ControlPanel: React.FC = () => {
-  const { isRunning, parameters, sources, gpuEnabled, scientistMode, actions } = useSimulationStore();
+  const { isRunning, parameters, sources, gpuEnabled, scientistMode, isDrawingObstacles, actions } = useSimulationStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleExport = () => {
@@ -110,7 +110,7 @@ export const ControlPanel: React.FC = () => {
         </div>
 
         {/* Scientist Mode Toggle */}
-        <div className="toggle-container">
+        <div className="toggle-container" style={{ marginBottom: '12px' }}>
           <div>
             <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>Scientist Mode</div>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
@@ -118,6 +118,19 @@ export const ControlPanel: React.FC = () => {
             </div>
           </div>
           <div className={`toggle-switch ${useSimulationStore(state => state.scientistMode) ? 'active' : ''}`} onClick={actions.toggleScientistMode}>
+            <div className="toggle-thumb"></div>
+          </div>
+        </div>
+
+        {/* Draw Obstacles Toggle */}
+        <div className="toggle-container">
+          <div>
+            <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>Draw Obstacles</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+              Click on canvas to place walls
+            </div>
+          </div>
+          <div className={`toggle-switch ${isDrawingObstacles ? 'active' : ''}`} onClick={actions.toggleDrawingObstacles}>
             <div className="toggle-thumb"></div>
           </div>
         </div>

@@ -45,6 +45,7 @@ export interface SimulationState {
   fps: number;
   gpuEnabled: boolean;
   scientistMode: boolean;
+  isDrawingObstacles: boolean;
 }
 
 // UI types
