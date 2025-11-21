@@ -70,6 +70,16 @@ export class FluidDynamics {
     return this.density.map(row => [...row]);
   }
 
+  // Get velocity X field
+  getVelocityX(): number[][] {
+    return this.u.map(row => [...row]);
+  }
+
+  // Get velocity Y field
+  getVelocityY(): number[][] {
+    return this.v.map(row => [...row]);
+  }
+
   // Add source to density
   addDensitySource(x: number, y: number, amount: number): void {
     if (x >= 0 && x < this.gridSize && y >= 0 && y < this.gridSize) {

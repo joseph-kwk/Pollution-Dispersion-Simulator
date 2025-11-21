@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useSimulationStore } from '../stores/simulationStore';
-import { GRID_SIZE } from '../types';
+import { GRID_SIZE, POLLUTANT_TYPES } from '../types';
 import { FluidDynamics } from '../physics/FluidDynamics';
 import * as THREE from 'three';
 
@@ -140,9 +140,11 @@ export const ThreeDSimulationCanvas: React.FC = () => {
     const lifetimes = particlesRef.current.geometry.attributes.lifetime.array as Float32Array;
 
     const grid = fluidDynamicsRef.current.getDensity();
+    const gridU = fluidDynamicsRef.current.getVelocityX();
+    const gridV = fluidDynamicsRef.current.getVelocityY();
     const halfGrid = GRID_SIZE / 2;
 
-    // Wind direction in radians
+    // Wind direction in radians (used for initial velocity)
     const windAngle = (parameters.windDirection * Math.PI) / 180;
     const windVelX = parameters.windSpeed * Math.cos(windAngle) * 0.05;
     const windVelZ = parameters.windSpeed * Math.sin(windAngle) * 0.05;
@@ -168,9 +170,25 @@ export const ThreeDSimulationCanvas: React.FC = () => {
         }
       }
 
-      // Apply wind velocity
-      velocities[i3] += windVelX * 0.1;
-      velocities[i3 + 2] += windVelZ * 0.1;
+      // Get grid position
+      const gridX = Math.floor(positions[i3] + halfGrid);
+      const gridZ = Math.floor(positions[i3 + 2] + halfGrid);
+
+      // Sample fluid velocity field
+      let fluidU = 0;
+      let fluidV = 0;
+      let density = 0;
+
+      if (gridX >= 0 && gridX < GRID_SIZE && gridZ >= 0 && gridZ < GRID_SIZE) {
+        fluidU = gridU[gridZ][gridX];
+        fluidV = gridV[gridZ][gridX];
+        density = grid[gridZ][gridX];
+      }
+
+      // Apply fluid velocity forces (Advection)
+      // We blend the particle's current velocity with the fluid velocity
+      velocities[i3] += (fluidU * 0.1 - velocities[i3] * 0.02);
+      velocities[i3 + 2] += (fluidV * 0.1 - velocities[i3 + 2] * 0.02);
 
       // Update position
       positions[i3] += velocities[i3];
@@ -178,24 +196,9 @@ export const ThreeDSimulationCanvas: React.FC = () => {
       positions[i3 + 2] += velocities[i3 + 2];
 
       // Apply turbulence
-      positions[i3] += (Math.random() - 0.5) * 0.05;
-      positions[i3 + 2] += (Math.random() - 0.5) * 0.05;
+      positions[i3] += (Math.random() - 0.5) * 0.02;
+      positions[i3 + 2] += (Math.random() - 0.5) * 0.02;
 
-      // Gravity effect
-      velocities[i3 + 1] -= 0.002;
-
-      // Get density at particle position
-      const gridX = Math.floor(positions[i3] + halfGrid);
-      const gridZ = Math.floor(positions[i3 + 2] + halfGrid);
-
-      let density = 0;
-      if (gridX >= 0 && gridX < GRID_SIZE && gridZ >= 0 && gridZ < GRID_SIZE) {
-        density = grid[gridZ][gridX];
-      }
-
-      // Color based on density and pollutant type
-      const normalizedDensity = Math.min(density / 255, 1.0);
-      
       // Determine dominant pollutant type at this location
       let dominantType = sources.length > 0 ? sources[0].type : 'CHEMICAL';
       if (sources.length > 1) {
@@ -212,24 +215,28 @@ export const ThreeDSimulationCanvas: React.FC = () => {
         });
       }
 
+      // Apply vertical movement based on pollutant properties (Buoyancy/Gravity)
+      const pollutantDef = POLLUTANT_TYPES[dominantType];
+      // sinkRate > 0 means it sinks (gravity), < 0 means it rises (buoyancy)
+      velocities[i3 + 1] -= pollutantDef.behavior.sinkRate * 0.005;
+      
+      // Floor collision
+      if (positions[i3 + 1] < 0) {
+        positions[i3 + 1] = 0;
+        velocities[i3 + 1] *= -0.5; // Bounce
+      }
+
+      // Color based on density and pollutant type
+      const normalizedDensity = Math.min(density / 255, 1.0);
+      
       // Get base color from pollutant type
       let baseR = 0.5, baseG = 0.7, baseB = 1.0; // Default: clean air (light blue)
       
       if (normalizedDensity > 0.05) { // Only colorize if there's significant pollution
-        switch (dominantType) {
-          case 'CHEMICAL':
-            baseR = 139 / 255; baseG = 0; baseB = 0; // Dark red
-            break;
-          case 'OIL':
-            baseR = 47 / 255; baseG = 79 / 255; baseB = 79 / 255; // Dark teal
-            break;
-          case 'SEWAGE':
-            baseR = 101 / 255; baseG = 67 / 255; baseB = 33 / 255; // Brown
-            break;
-          case 'THERMAL':
-            baseR = 255 / 255; baseG = 140 / 255; baseB = 0; // Orange
-            break;
-        }
+        const color = pollutantDef.baseColor;
+        baseR = color.r / 255;
+        baseG = color.g / 255;
+        baseB = color.b / 255;
       }
       
       // Interpolate from clean air (light blue) to pollutant color based on density
