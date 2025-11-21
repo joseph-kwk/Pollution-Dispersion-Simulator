@@ -10,6 +10,7 @@ interface SimulationStore extends SimulationState {
     addSource: (source: Omit<PollutionSource, 'active'>) => void;
     removeSource: (index: number) => void;
     toggleGPU: () => void;
+    toggleScientistMode: () => void;
     setGrid: (grid: number[][]) => void;
     setObstacles: (obstacles: boolean[][]) => void;
     setFPS: (fps: number) => void;
@@ -43,7 +44,8 @@ const initialState: SimulationState = {
   }],
   parameters: initialParameters,
   fps: 0,
-  gpuEnabled: false
+  gpuEnabled: false,
+  scientistMode: false
 };
 
 export const useSimulationStore = create<SimulationStore>((set) => ({
@@ -73,6 +75,7 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
       sources: state.sources.filter((_, i) => i !== index)
     })),
     toggleGPU: () => set((state) => ({ gpuEnabled: !state.gpuEnabled })),
+    toggleScientistMode: () => set((state) => ({ scientistMode: !state.scientistMode })),
     setGrid: (grid) => set({ grid }),
     setObstacles: (obstacles) => set({ obstacles }),
     setFPS: (fps) => set({ fps })

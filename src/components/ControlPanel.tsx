@@ -14,8 +14,10 @@ export const ControlPanel: React.FC = () => {
 
       {/* Performance Section */}
       <div className="control-section">
-        <h3 className="section-title">Performance</h3>
-        <div className="toggle-container">
+        <h3 className="section-title">Settings</h3>
+        
+        {/* GPU Toggle */}
+        <div className="toggle-container" style={{ marginBottom: '12px' }}>
           <div>
             <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>GPU Acceleration</div>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
@@ -23,6 +25,19 @@ export const ControlPanel: React.FC = () => {
             </div>
           </div>
           <div className={`toggle-switch ${gpuEnabled ? 'active' : ''}`} onClick={actions.toggleGPU}>
+            <div className="toggle-thumb"></div>
+          </div>
+        </div>
+
+        {/* Scientist Mode Toggle */}
+        <div className="toggle-container">
+          <div>
+            <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>Scientist Mode</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+              Show grid & vectors
+            </div>
+          </div>
+          <div className={`toggle-switch ${useSimulationStore(state => state.scientistMode) ? 'active' : ''}`} onClick={actions.toggleScientistMode}>
             <div className="toggle-thumb"></div>
           </div>
         </div>

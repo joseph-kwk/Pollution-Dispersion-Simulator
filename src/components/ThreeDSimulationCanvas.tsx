@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useSimulationStore } from '../stores/simulationStore';
-import { GRID_SIZE, PollutionSource } from '../types';
+import { GRID_SIZE } from '../types';
 import { FluidDynamics } from '../physics/FluidDynamics';
 import * as THREE from 'three';
 
@@ -22,10 +22,12 @@ export const ThreeDSimulationCanvas: React.FC = () => {
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const particlesRef = useRef<THREE.Points | null>(null);
+  const gridHelperRef = useRef<THREE.GridHelper | null>(null);
+  const vectorGroupRef = useRef<THREE.Group | null>(null);
   const fluidDynamicsRef = useRef<FluidDynamics | null>(null);
   const animationFrameRef = useRef<number | null>(null);
 
-  const { sources, parameters, isRunning, obstacles, gpuEnabled, actions } = useSimulationStore();
+  const { sources, parameters, isRunning, gpuEnabled, scientistMode } = useSimulationStore();
   const [currentAQI, setCurrentAQI] = useState(0);
 
   const initThreeJS = useCallback(() => {
@@ -57,7 +59,15 @@ export const ThreeDSimulationCanvas: React.FC = () => {
 
     // Grid helper
     const gridHelper = new THREE.GridHelper(GRID_SIZE, GRID_SIZE, 0x444444, 0x222222);
+    gridHelper.visible = scientistMode;
     scene.add(gridHelper);
+    gridHelperRef.current = gridHelper;
+
+    // Vector field group
+    const vectorGroup = new THREE.Group();
+    vectorGroup.visible = scientistMode;
+    scene.add(vectorGroup);
+    vectorGroupRef.current = vectorGroup;
 
     // Ambient light
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
@@ -239,6 +249,40 @@ export const ThreeDSimulationCanvas: React.FC = () => {
     particlesRef.current.geometry.attributes.color.needsUpdate = true;
   }, [sources, parameters]);
 
+  // Update scientist mode visuals
+  useEffect(() => {
+    if (gridHelperRef.current) {
+      gridHelperRef.current.visible = scientistMode;
+    }
+    if (vectorGroupRef.current) {
+      vectorGroupRef.current.visible = scientistMode;
+      
+      // Update vectors if visible
+      if (scientistMode) {
+        // Clear existing
+        while (vectorGroupRef.current.children.length > 0) {
+          vectorGroupRef.current.remove(vectorGroupRef.current.children[0]);
+        }
+
+        const step = 8; // Every 8th cell
+        const halfGrid = GRID_SIZE / 2;
+        const windAngle = (parameters.windDirection * Math.PI) / 180;
+        // Direction vector
+        const dir = new THREE.Vector3(Math.cos(windAngle), 0, Math.sin(windAngle)).normalize();
+        const length = Math.max(2, parameters.windSpeed * 3);
+        const hex = 0xffff00; // Yellow arrows
+
+        for (let x = 0; x < GRID_SIZE; x += step) {
+          for (let z = 0; z < GRID_SIZE; z += step) {
+            const origin = new THREE.Vector3(x - halfGrid, 2, z - halfGrid);
+            const arrowHelper = new THREE.ArrowHelper(dir, origin, length, hex, length * 0.3, length * 0.15);
+            vectorGroupRef.current.add(arrowHelper);
+          }
+        }
+      }
+    }
+  }, [scientistMode, parameters.windDirection, parameters.windSpeed]);
+
   const animate = useCallback(() => {
     if (!sceneRef.current || !cameraRef.current || !rendererRef.current) return;
 
@@ -354,8 +398,8 @@ export const ThreeDSimulationCanvas: React.FC = () => {
         background: 'linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 100%)',
       }}
     >
-      {/* Air Quality Emoji Overlay */}
-      {isRunning && (
+      {/* Air Quality Emoji Overlay - Hidden in Scientist Mode */}
+      {isRunning && !scientistMode && (
         <div className="canvas-aqi-indicator">
           <div className="canvas-aqi-emoji" style={{ 
             fontSize: '3rem',
