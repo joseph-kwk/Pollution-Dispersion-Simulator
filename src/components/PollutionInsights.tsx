@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSimulationStore } from '../stores/simulationStore';
 import { POLLUTANT_TYPES } from '../types';
 import { FileText } from 'lucide-react';
 
 export const PollutionInsights: React.FC = () => {
   const { sources, grid, parameters } = useSimulationStore();
+  const [aqiHistory, setAqiHistory] = useState<number[]>(new Array(60).fill(0));
 
   // Calculate total pollution
   const totalPollution = grid.reduce((sum, row) => 
@@ -13,6 +14,13 @@ export const PollutionInsights: React.FC = () => {
 
   // Calculate air quality index (0-500)
   const aqi = Math.min(500, Math.floor((totalPollution / (grid.length * grid[0].length)) * 2));
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setAqiHistory(prev => [...prev.slice(1), aqi]);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [aqi]);
 
   const getAQICategory = () => {
     if (aqi <= 50) return { level: 'Good', color: '#10b981', icon: '😊' };
@@ -86,7 +94,7 @@ export const PollutionInsights: React.FC = () => {
   };
 
   return (
-    <div className="pollution-insights">
+    <div className="pollution-insights" data-tour="pollution-insights">
       <div className="insights-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h3 className="insights-title">Environmental Impact</h3>
         <button 
@@ -119,6 +127,37 @@ export const PollutionInsights: React.FC = () => {
             }}
           />
         </div>
+      </div>
+
+      {/* Real-Time Graph */}
+      <div className="aqi-chart-container" style={{ marginBottom: '1rem', background: 'rgba(0,0,0,0.1)', padding: '10px', borderRadius: '8px' }}>
+        <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '5px', display: 'flex', justifyContent: 'space-between' }}>
+          <span>LIVE AQI TREND (60s)</span>
+          <span style={{ color: aqiCategory.color }}>● Live</span>
+        </div>
+        <svg viewBox="0 0 300 60" style={{ width: '100%', height: '60px', overflow: 'visible' }}>
+          {/* Grid lines */}
+          <line x1="0" y1="0" x2="300" y2="0" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+          <line x1="0" y1="30" x2="300" y2="30" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+          <line x1="0" y1="60" x2="300" y2="60" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+          
+          {/* Area Path */}
+          <path
+            d={`M 0 60 ${aqiHistory.map((val, i) => `L ${(i / 59) * 300} ${60 - (val / 500) * 60}`).join(' ')} L 300 60 Z`}
+            fill={aqiCategory.color}
+            fillOpacity="0.2"
+          />
+          
+          {/* Line Path */}
+          <path
+            d={`M 0 ${60 - (aqiHistory[0] / 500) * 60} ${aqiHistory.map((val, i) => `L ${(i / 59) * 300} ${60 - (val / 500) * 60}`).join(' ')}`}
+            fill="none"
+            stroke={aqiCategory.color}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
       </div>
 
       {/* Pollution Type Insights */}

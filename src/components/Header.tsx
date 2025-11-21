@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Wind, Sun, Moon } from 'lucide-react';
+import { Wind, Sun, Moon, HelpCircle } from 'lucide-react';
 
 export const Header: React.FC = () => {
   const [isDark, setIsDark] = React.useState(false);
@@ -9,6 +9,10 @@ export const Header: React.FC = () => {
   const toggleTheme = () => {
     setIsDark(!isDark);
     document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  };
+
+  const startTour = () => {
+    window.dispatchEvent(new CustomEvent('start-tour'));
   };
 
   return (
@@ -35,6 +39,7 @@ export const Header: React.FC = () => {
           <Link 
             to="/case-studies" 
             className={`nav-link ${location.pathname === '/case-studies' ? 'active' : ''}`}
+            data-tour="case-studies-nav"
           >
             <span className="nav-icon">📚</span>
             <span>Case Studies</span>
@@ -47,6 +52,14 @@ export const Header: React.FC = () => {
           <div className="status-dot active"></div>
           <span id="systemStatus">Online</span>
         </div>
+        <button
+          className="theme-toggle"
+          onClick={startTour}
+          title="Start Tour"
+          style={{ marginRight: '8px' }}
+        >
+          <HelpCircle size={20} />
+        </button>
         <button
           className="theme-toggle"
           onClick={toggleTheme}

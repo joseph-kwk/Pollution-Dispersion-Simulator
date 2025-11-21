@@ -12,6 +12,7 @@ interface SimulationStore extends SimulationState {
     toggleGPU: () => void;
     toggleScientistMode: () => void;
     toggleDrawingObstacles: () => void;
+    toggleDynamicWeather: () => void;
     setGrid: (grid: number[][]) => void;
     setObstacles: (obstacles: boolean[][]) => void;
     addObstacle: (x: number, y: number) => void;
@@ -49,7 +50,8 @@ const initialState: SimulationState = {
   fps: 0,
   gpuEnabled: false,
   scientistMode: false,
-  isDrawingObstacles: false
+  isDrawingObstacles: false,
+  dynamicWeather: false
 };
 
 export const useSimulationStore = create<SimulationStore>((set) => ({
@@ -81,6 +83,7 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
     toggleGPU: () => set((state) => ({ gpuEnabled: !state.gpuEnabled })),
     toggleScientistMode: () => set((state) => ({ scientistMode: !state.scientistMode })),
     toggleDrawingObstacles: () => set((state) => ({ isDrawingObstacles: !state.isDrawingObstacles })),
+    toggleDynamicWeather: () => set((state) => ({ dynamicWeather: !state.dynamicWeather })),
     setGrid: (grid) => set({ grid }),
     setObstacles: (obstacles) => set({ obstacles }),
     addObstacle: (x, y) => set((state) => {

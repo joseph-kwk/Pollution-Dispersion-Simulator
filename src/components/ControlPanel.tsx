@@ -57,7 +57,7 @@ export const ControlPanel: React.FC = () => {
   };
 
   return (
-    <div className="sidebar-content">
+    <div className="sidebar-content" data-tour="controls-panel">
       <div className="sidebar-header">
         <h2 className="sidebar-title">Controls</h2>
       </div>
@@ -93,7 +93,7 @@ export const ControlPanel: React.FC = () => {
       </div>
 
       {/* Performance Section */}
-      <div className="control-section">
+      <div className="control-section" data-tour="settings-section">
         <h3 className="section-title">Settings</h3>
         
         {/* GPU Toggle */}
@@ -131,6 +131,19 @@ export const ControlPanel: React.FC = () => {
             </div>
           </div>
           <div className={`toggle-switch ${isDrawingObstacles ? 'active' : ''}`} onClick={actions.toggleDrawingObstacles}>
+            <div className="toggle-thumb"></div>
+          </div>
+        </div>
+
+        {/* Dynamic Weather Toggle */}
+        <div className="toggle-container">
+          <div>
+            <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>Dynamic Weather</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+              Vary wind speed & direction
+            </div>
+          </div>
+          <div className={`toggle-switch ${useSimulationStore(state => state.dynamicWeather) ? 'active' : ''}`} onClick={actions.toggleDynamicWeather}>
             <div className="toggle-thumb"></div>
           </div>
         </div>

@@ -7,9 +7,11 @@ import { StatusBar } from './components/StatusBar';
 import { SimulationCommentary } from './components/SimulationCommentary';
 import { PollutionInsights } from './components/PollutionInsights';
 import { CaseStudies } from './components/CaseStudies';
+import { TourGuide } from './components/TourGuide';
 
 const SimulatorPage: React.FC = () => (
   <>
+    <TourGuide />
     <aside className="sidebar">
       <ControlPanel />
       <PollutionInsights />

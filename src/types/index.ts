@@ -46,6 +46,7 @@ export interface SimulationState {
   gpuEnabled: boolean;
   scientistMode: boolean;
   isDrawingObstacles: boolean;
+  dynamicWeather: boolean;
 }
 
 // UI types

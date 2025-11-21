@@ -31,7 +31,7 @@ export const ThreeDSimulationCanvas: React.FC = () => {
   const mouseRef = useRef<THREE.Vector2>(new THREE.Vector2());
   const planeRef = useRef<THREE.Mesh | null>(null);
 
-  const { sources, parameters, isRunning, gpuEnabled, scientistMode, isDrawingObstacles, obstacles, actions } = useSimulationStore();
+  const { sources, parameters, isRunning, gpuEnabled, scientistMode, isDrawingObstacles, obstacles, dynamicWeather, actions } = useSimulationStore();
   const [currentAQI, setCurrentAQI] = useState(0);
 
   const initThreeJS = useCallback(() => {
@@ -148,7 +148,7 @@ export const ThreeDSimulationCanvas: React.FC = () => {
     console.log('Three.js scene initialized with', PARTICLE_COUNT, 'particles');
   }, [gpuEnabled]);
 
-  const updateParticles = useCallback(() => {
+  const updateParticles = useCallback((currentWindDir: number, currentWindSpeed: number) => {
     if (!particlesRef.current || !fluidDynamicsRef.current) return;
 
     const positions = particlesRef.current.geometry.attributes.position.array as Float32Array;
@@ -162,9 +162,9 @@ export const ThreeDSimulationCanvas: React.FC = () => {
     const halfGrid = GRID_SIZE / 2;
 
     // Wind direction in radians (used for initial velocity)
-    const windAngle = (parameters.windDirection * Math.PI) / 180;
-    const windVelX = parameters.windSpeed * Math.cos(windAngle) * 0.05;
-    const windVelZ = parameters.windSpeed * Math.sin(windAngle) * 0.05;
+    const windAngle = (currentWindDir * Math.PI) / 180;
+    const windVelX = currentWindSpeed * Math.cos(windAngle) * 0.05;
+    const windVelZ = currentWindSpeed * Math.sin(windAngle) * 0.05;
 
     for (let i = 0; i < PARTICLE_COUNT; i++) {
       const i3 = i * 3;
@@ -271,7 +271,7 @@ export const ThreeDSimulationCanvas: React.FC = () => {
 
     particlesRef.current.geometry.attributes.position.needsUpdate = true;
     particlesRef.current.geometry.attributes.color.needsUpdate = true;
-  }, [sources, parameters]);
+  }, [sources]);
 
   // Update scientist mode visuals
   useEffect(() => {
@@ -377,11 +377,27 @@ export const ThreeDSimulationCanvas: React.FC = () => {
     if (!sceneRef.current || !cameraRef.current || !rendererRef.current) return;
 
     if (isRunning && fluidDynamicsRef.current) {
+      // Calculate dynamic wind
+      let windDir = parameters.windDirection;
+      let windSpeed = parameters.windSpeed;
+
+      if (dynamicWeather) {
+        const time = Date.now() * 0.0005;
+        // Vary direction by +/- 45 degrees
+        windDir += Math.sin(time) * 45;
+        // Vary speed by +/- 0.3
+        windSpeed += Math.sin(time * 1.3) * 0.3;
+        windSpeed = Math.max(0.1, windSpeed);
+      }
+
+      // Create temporary parameters with dynamic wind
+      const currentParams = { ...parameters, windDirection: windDir, windSpeed: windSpeed };
+
       // Run fluid dynamics simulation
-      fluidDynamicsRef.current.step(parameters, sources);
+      fluidDynamicsRef.current.step(currentParams, sources);
       
       // Update particles based on simulation
-      updateParticles();
+      updateParticles(windDir, windSpeed);
 
       // Update scene background based on average pollution level
       const grid = fluidDynamicsRef.current.getDensity();
@@ -425,7 +441,7 @@ export const ThreeDSimulationCanvas: React.FC = () => {
 
     rendererRef.current.render(sceneRef.current, cameraRef.current);
     animationFrameRef.current = requestAnimationFrame(animate);
-  }, [isRunning, sources, parameters, updateParticles]);
+  }, [isRunning, sources, parameters, updateParticles, dynamicWeather]);
 
   const handleResize = useCallback(() => {
     if (!containerRef.current || !cameraRef.current || !rendererRef.current) return;
@@ -481,6 +497,7 @@ export const ThreeDSimulationCanvas: React.FC = () => {
   return (
     <div
       ref={containerRef}
+      data-tour="simulation-canvas"
       style={{
         width: '100%',
         height: '100%',
