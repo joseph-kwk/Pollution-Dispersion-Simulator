@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ChevronRight, ChevronLeft } from 'lucide-react';
+import { X, ChevronRight } from 'lucide-react';
 
 interface TourStep {
   target: string; // CSS selector
