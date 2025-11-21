@@ -1,9 +1,10 @@
 import React from 'react';
 import { useSimulationStore } from '../stores/simulationStore';
 import { POLLUTANT_TYPES } from '../types';
+import { FileText } from 'lucide-react';
 
 export const PollutionInsights: React.FC = () => {
-  const { sources, grid } = useSimulationStore();
+  const { sources, grid, parameters } = useSimulationStore();
 
   // Calculate total pollution
   const totalPollution = grid.reduce((sum, row) => 
@@ -60,10 +61,43 @@ export const PollutionInsights: React.FC = () => {
   const currentPollutant = sources[0]?.type || 'CHEMICAL';
   const description = getPollutantDescription(currentPollutant);
 
+  const handleDownloadReport = () => {
+    const report = {
+      timestamp: new Date().toLocaleString(),
+      simulationStatus: {
+        aqi: aqi,
+        category: aqiCategory.level,
+        pollutantType: POLLUTANT_TYPES[currentPollutant].name,
+        sourceCount: sources.length
+      },
+      parameters: parameters,
+      healthImpact: description.healthImpact
+    };
+
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pollution-report-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="pollution-insights">
-      <div className="insights-header">
+      <div className="insights-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h3 className="insights-title">Environmental Impact</h3>
+        <button 
+          className="btn btn-sm btn-secondary"
+          onClick={handleDownloadReport}
+          title="Download Report"
+          style={{ padding: '4px 8px' }}
+        >
+          <FileText style={{ width: '14px', height: '14px', marginRight: '4px' }} />
+          Report
+        </button>
       </div>
 
       {/* Air Quality Index */}

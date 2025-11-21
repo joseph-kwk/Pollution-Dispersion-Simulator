@@ -1,15 +1,95 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { useSimulationStore } from '../stores/simulationStore';
 import { POLLUTANT_TYPES, GRID_SIZE } from '../types';
-import { Play, Pause, RotateCcw, Wind, Waves, Droplets, Plus, Trash2 } from 'lucide-react';
+import { Play, Pause, RotateCcw, Wind, Waves, Droplets, Plus, Trash2, Download, Upload, FileJson } from 'lucide-react';
 
 export const ControlPanel: React.FC = () => {
-  const { isRunning, parameters, sources, gpuEnabled, actions } = useSimulationStore();
+  const { isRunning, parameters, sources, gpuEnabled, scientistMode, actions } = useSimulationStore();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExport = () => {
+    const config = {
+      parameters,
+      sources,
+      timestamp: new Date().toISOString(),
+      version: '1.0'
+    };
+    const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pollution-sim-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const config = JSON.parse(e.target?.result as string);
+        if (config.parameters && config.sources) {
+          actions.updateParameters(config.parameters);
+          // Clear existing sources and add new ones
+          // Note: We need to handle this carefully in the store, but for now we'll just reset and add
+          actions.reset();
+          setTimeout(() => {
+            actions.updateParameters(config.parameters);
+            // Remove default source
+            actions.removeSource(0);
+            // Add imported sources
+            config.sources.forEach((source: any) => actions.addSource(source));
+          }, 100);
+        }
+      } catch (error) {
+        console.error('Failed to import configuration:', error);
+        alert('Invalid configuration file');
+      }
+    };
+    reader.readAsText(file);
+    // Reset input
+    event.target.value = '';
+  };
 
   return (
     <div className="sidebar-content">
       <div className="sidebar-header">
         <h2 className="sidebar-title">Controls</h2>
+      </div>
+
+      {/* Session Management */}
+      <div className="control-section">
+        <h3 className="section-title">Session</h3>
+        <div className="btn-group">
+          <button 
+            className="btn btn-secondary ripple scale-hover"
+            onClick={handleExport}
+            title="Save current configuration"
+          >
+            <Download style={{ width: '16px', height: '16px' }} />
+            Save
+          </button>
+          <button 
+            className="btn btn-secondary ripple scale-hover"
+            onClick={() => fileInputRef.current?.click()}
+            title="Load configuration"
+          >
+            <Upload style={{ width: '16px', height: '16px' }} />
+            Load
+          </button>
+          <input 
+            type="file" 
+            ref={fileInputRef}
+            style={{ display: 'none' }}
+            accept=".json"
+            onChange={handleImport}
+          />
+        </div>
       </div>
 
       {/* Performance Section */}
