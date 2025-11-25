@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSimulationStore } from '../stores/simulationStore';
 import { POLLUTANT_TYPES } from '../types';
-import { FileText, Download, CheckCircle, X, BarChart3 } from 'lucide-react';
+import { FileText, Download, CheckCircle, X, BarChart3, FileSpreadsheet } from 'lucide-react';
 
 export const PollutionInsights: React.FC = () => {
   const { sources, grid, parameters } = useSimulationStore();
@@ -126,6 +126,52 @@ export const PollutionInsights: React.FC = () => {
     const a = document.createElement('a');
     a.href = url;
     a.download = `pollution-report-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setShowReportModal(false);
+  };
+
+  const downloadCSV = () => {
+    const avgAQI = Math.floor(aqiHistory.reduce((a, b) => a + b, 0) / aqiHistory.length);
+    const maxAQI = Math.max(...aqiHistory);
+    const minAQI = Math.min(...aqiHistory.filter(v => v > 0));
+
+    // Build CSV content
+    let csv = 'Environmental Impact Report - CSV Export\n';
+    csv += `Generated,${new Date().toLocaleString()}\n\n`;
+    
+    csv += 'SUMMARY STATISTICS\n';
+    csv += 'Metric,Value\n';
+    csv += `Current AQI,${aqi}\n`;
+    csv += `Average AQI,${avgAQI}\n`;
+    csv += `Peak AQI,${maxAQI}\n`;
+    csv += `Minimum AQI,${minAQI}\n`;
+    csv += `Category,${aqiCategory.level}\n`;
+    csv += `Pollutant Type,${POLLUTANT_TYPES[currentPollutant].name}\n`;
+    csv += `Number of Sources,${sources.length}\n\n`;
+    
+    csv += 'ENVIRONMENTAL PARAMETERS\n';
+    csv += 'Parameter,Value\n';
+    csv += `Wind Direction,${parameters.windDirection}°\n`;
+    csv += `Wind Speed,${parameters.windSpeed}\n`;
+    csv += `Diffusion Rate,${parameters.diffusionRate}\n`;
+    csv += `Release Rate,${parameters.releaseRate}\n`;
+    csv += `Viscosity,${parameters.viscosity}\n`;
+    csv += `Decay Factor,${parameters.decayFactor}\n\n`;
+    
+    csv += 'AQI TREND DATA (60 seconds)\n';
+    csv += 'Second,AQI Value\n';
+    aqiHistory.forEach((value, idx) => {
+      csv += `${idx + 1},${value}\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pollution-data-${new Date().toISOString().slice(0,10)}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -387,12 +433,20 @@ export const PollutionInsights: React.FC = () => {
                 Cancel
               </button>
               <button 
+                className="btn btn-secondary"
+                onClick={downloadCSV}
+                style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <FileSpreadsheet size={14} />
+                Export CSV
+              </button>
+              <button 
                 className="btn btn-primary"
                 onClick={confirmDownloadReport}
                 style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
               >
                 <Download size={14} />
-                Download Report
+                Download JSON
               </button>
             </div>
           </div>

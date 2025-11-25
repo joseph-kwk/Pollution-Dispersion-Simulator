@@ -8,11 +8,15 @@ import { SimulationCommentary } from './components/SimulationCommentary';
 import { PollutionInsights } from './components/PollutionInsights';
 import { CaseStudies } from './components/CaseStudies';
 import { TourGuide } from './components/TourGuide';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
-const SimulatorPage: React.FC = () => (
-  <>
-    <TourGuide />
-    <aside className="sidebar">
+const SimulatorPage: React.FC = () => {
+  useKeyboardShortcuts();
+  
+  return (
+    <>
+      <TourGuide />
+      <aside className="sidebar">
       <ControlPanel />
       <PollutionInsights />
     </aside>
@@ -23,7 +27,8 @@ const SimulatorPage: React.FC = () => (
       </div>
     </main>
   </>
-);
+  );
+};
 
 const CaseStudiesPage: React.FC = () => (
   <main className="app-main case-studies-page">

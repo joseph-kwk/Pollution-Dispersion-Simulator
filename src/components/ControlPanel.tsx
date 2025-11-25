@@ -1,7 +1,7 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useSimulationStore } from '../stores/simulationStore';
 import { POLLUTANT_TYPES, GRID_SIZE } from '../types';
-import { Play, Pause, RotateCcw, Wind, Waves, Droplets, Plus, Trash2, Download, Upload, FileJson, Square, CheckCircle, AlertCircle, X } from 'lucide-react';
+import { Play, Pause, RotateCcw, Wind, Waves, Droplets, Plus, Trash2, Download, Upload, FileJson, Square, CheckCircle, AlertCircle, X, Info, Keyboard } from 'lucide-react';
 
 export const ControlPanel: React.FC = () => {
   const { isRunning, parameters, sources, gpuEnabled, scientistMode, isDrawingObstacles, actions } = useSimulationStore();
@@ -9,6 +9,31 @@ export const ControlPanel: React.FC = () => {
   const [showExportModal, setShowExportModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importedConfig, setImportedConfig] = useState<any>(null);
+  const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
+  const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
+
+  useEffect(() => {
+    const handleKeyboardSave = () => setShowExportModal(true);
+    const handleShowShortcuts = () => setShowShortcutsHelp(true);
+
+    window.addEventListener('keyboard-save', handleKeyboardSave);
+    window.addEventListener('show-shortcuts-help', handleShowShortcuts);
+
+    return () => {
+      window.removeEventListener('keyboard-save', handleKeyboardSave);
+      window.removeEventListener('show-shortcuts-help', handleShowShortcuts);
+    };
+  }, []);
+
+  const tooltips = {
+    windDirection: 'Direction from which wind blows (0°=North, 90°=East, 180°=South, 270°=West). Determines primary dispersion path.',
+    windSpeed: 'How fast air moves. Higher speeds spread pollution faster but dilute it more quickly. Range: 0-2 m/s.',
+    diffusionRate: 'How quickly pollution spreads from high to low concentration areas. Think of it like dye in water - higher values = faster mixing.',
+    releaseRate: 'Amount of pollution emitted per time step. Higher values create more intense pollution clouds.',
+    viscosity: 'Fluid "thickness" that resists flow. Higher viscosity = slower, more stable dispersion patterns.',
+    decayFactor: 'Natural breakdown rate of pollutants over time. Values closer to 1 = slower decay. Simulates chemical breakdown or settling.',
+    pollutantType: 'Different pollutants behave differently: oils float, chemicals sink, thermal pollution rises. Each has unique dispersion physics.'
+  };
 
   const handleExport = () => {
     setShowExportModal(true);
@@ -94,7 +119,7 @@ export const ControlPanel: React.FC = () => {
           <button 
             className="btn btn-secondary ripple scale-hover"
             onClick={handleExport}
-            title="Save current configuration"
+            title="Save current configuration (S)"
           >
             <Download style={{ width: '16px', height: '16px' }} />
             Save
@@ -107,6 +132,16 @@ export const ControlPanel: React.FC = () => {
             <Upload style={{ width: '16px', height: '16px' }} />
             Load
           </button>
+        </div>
+        <button 
+          className="btn btn-secondary ripple scale-hover"
+          onClick={() => setShowShortcutsHelp(true)}
+          title="View keyboard shortcuts (?)"
+          style={{ width: '100%', marginTop: '8px' }}
+        >
+          <Keyboard style={{ width: '16px', height: '16px' }} />
+          Shortcuts
+        </button>
           <input 
             type="file" 
             ref={fileInputRef}
@@ -286,6 +321,111 @@ export const ControlPanel: React.FC = () => {
         </div>
       )}
 
+      {/* Keyboard Shortcuts Help Modal */}
+      {showShortcutsHelp && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.7)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+            borderRadius: '16px',
+            padding: '24px',
+            maxWidth: '500px',
+            width: '90%',
+            border: '1px solid rgba(139, 92, 246, 0.3)',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.5)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <Keyboard size={24} color="#8b5cf6" />
+                <h3 style={{ margin: 0, color: 'white', fontSize: '18px' }}>Keyboard Shortcuts</h3>
+              </div>
+              <button 
+                onClick={() => setShowShortcutsHelp(false)}
+                style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gap: '12px' }}>
+              {[
+                { key: 'Space', action: 'Play / Pause simulation' },
+                { key: 'R', action: 'Reset simulation' },
+                { key: 'S', action: 'Save configuration' },
+                { key: 'G', action: 'Toggle GPU acceleration' },
+                { key: 'V', action: 'Toggle Scientist Mode (vectors)' },
+                { key: 'D', action: 'Toggle Draw Obstacles mode' },
+                { key: 'W', action: 'Toggle Dynamic Weather' },
+                { key: '?', action: 'Show this help' }
+              ].map((shortcut, idx) => (
+                <div key={idx} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '10px 12px',
+                  background: 'rgba(0,0,0,0.2)',
+                  borderRadius: '8px',
+                  fontSize: '13px'
+                }}>
+                  <span style={{ color: 'rgba(255,255,255,0.9)' }}>{shortcut.action}</span>
+                  <kbd style={{
+                    padding: '4px 8px',
+                    background: 'rgba(139, 92, 246, 0.2)',
+                    border: '1px solid rgba(139, 92, 246, 0.4)',
+                    borderRadius: '4px',
+                    color: '#8b5cf6',
+                    fontWeight: 600,
+                    fontSize: '12px',
+                    fontFamily: 'monospace'
+                  }}>
+                    {shortcut.key}
+                  </kbd>
+                </div>
+              ))}
+            </div>
+
+            <div style={{
+              marginTop: '16px',
+              padding: '12px',
+              background: 'rgba(59, 130, 246, 0.1)',
+              border: '1px solid rgba(59, 130, 246, 0.3)',
+              borderRadius: '8px',
+              fontSize: '12px',
+              color: 'rgba(255,255,255,0.8)'
+            }}>
+              <strong style={{ color: '#60a5fa' }}>Tip:</strong> Keyboard shortcuts work when not typing in input fields. Press <kbd style={{
+                padding: '2px 6px',
+                background: 'rgba(139, 92, 246, 0.2)',
+                border: '1px solid rgba(139, 92, 246, 0.4)',
+                borderRadius: '4px',
+                color: '#8b5cf6',
+                fontFamily: 'monospace',
+                fontSize: '11px'
+              }}>?</kbd> anytime to see this help.
+            </div>
+
+            <button 
+              className="btn btn-primary"
+              onClick={() => setShowShortcutsHelp(false)}
+              style={{ width: '100%', marginTop: '16px', padding: '10px' }}
+            >
+              Got it!
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Performance Section */}
       <div className="control-section" data-tour="settings-section">
         <h3 className="section-title">Settings</h3>
@@ -376,9 +516,30 @@ export const ControlPanel: React.FC = () => {
 
         {/* Pollution Type */}
         <div className="control-group">
-          <label className="control-label">
-            Pollution Type
+          <label className="control-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span>Pollution Type</span>
+            <button
+              onClick={() => setActiveTooltip(activeTooltip === 'pollutantType' ? null : 'pollutantType')}
+              style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex' }}
+              title="Learn more"
+            >
+              <Info size={14} color="#8b5cf6" />
+            </button>
           </label>
+          {activeTooltip === 'pollutantType' && (
+            <div style={{
+              fontSize: '11px',
+              background: 'rgba(139, 92, 246, 0.1)',
+              border: '1px solid rgba(139, 92, 246, 0.3)',
+              borderRadius: '6px',
+              padding: '8px',
+              marginBottom: '8px',
+              color: 'rgba(255,255,255,0.9)',
+              lineHeight: 1.4
+            }}>
+              {tooltips.pollutantType}
+            </div>
+          )}
           <div className="select-container">
             <select
               className="select-input"
@@ -442,11 +603,34 @@ export const ControlPanel: React.FC = () => {
 
         {/* Wind Direction */}
         <div className="control-group">
-          <label className="control-label">
-            <Wind style={{ width: '14px', height: '14px', marginRight: '4px' }} />
-            Wind Direction
+          <label className="control-label" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+              <Wind style={{ width: '14px', height: '14px', marginRight: '4px' }} />
+              Wind Direction
+            </div>
+            <button
+              onClick={() => setActiveTooltip(activeTooltip === 'windDirection' ? null : 'windDirection')}
+              style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex' }}
+              title="Learn more"
+            >
+              <Info size={14} color="#8b5cf6" />
+            </button>
             <span className="control-value">{parameters.windDirection}°</span>
           </label>
+          {activeTooltip === 'windDirection' && (
+            <div style={{
+              fontSize: '11px',
+              background: 'rgba(139, 92, 246, 0.1)',
+              border: '1px solid rgba(139, 92, 246, 0.3)',
+              borderRadius: '6px',
+              padding: '8px',
+              marginBottom: '8px',
+              color: 'rgba(255,255,255,0.9)',
+              lineHeight: 1.4
+            }}>
+              {tooltips.windDirection}
+            </div>
+          )}
           <div className="range-container">
             <input
               type="range"
@@ -462,11 +646,34 @@ export const ControlPanel: React.FC = () => {
 
         {/* Wind Speed */}
         <div className="control-group">
-          <label className="control-label">
-            <Wind style={{ width: '14px', height: '14px', marginRight: '4px' }} />
-            Wind Speed
+          <label className="control-label" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+              <Wind style={{ width: '14px', height: '14px', marginRight: '4px' }} />
+              Wind Speed
+            </div>
+            <button
+              onClick={() => setActiveTooltip(activeTooltip === 'windSpeed' ? null : 'windSpeed')}
+              style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex' }}
+              title="Learn more"
+            >
+              <Info size={14} color="#8b5cf6" />
+            </button>
             <span className="control-value">{parameters.windSpeed}</span>
           </label>
+          {activeTooltip === 'windSpeed' && (
+            <div style={{
+              fontSize: '11px',
+              background: 'rgba(139, 92, 246, 0.1)',
+              border: '1px solid rgba(139, 92, 246, 0.3)',
+              borderRadius: '6px',
+              padding: '8px',
+              marginBottom: '8px',
+              color: 'rgba(255,255,255,0.9)',
+              lineHeight: 1.4
+            }}>
+              {tooltips.windSpeed}
+            </div>
+          )}
           <div className="range-container">
             <input
               type="range"
@@ -482,11 +689,34 @@ export const ControlPanel: React.FC = () => {
 
         {/* Diffusion Rate */}
         <div className="control-group">
-          <label className="control-label">
-            <Waves style={{ width: '14px', height: '14px', marginRight: '4px' }} />
-            Diffusion Rate
+          <label className="control-label" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+              <Waves style={{ width: '14px', height: '14px', marginRight: '4px' }} />
+              Diffusion Rate
+            </div>
+            <button
+              onClick={() => setActiveTooltip(activeTooltip === 'diffusionRate' ? null : 'diffusionRate')}
+              style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex' }}
+              title="Learn more"
+            >
+              <Info size={14} color="#8b5cf6" />
+            </button>
             <span className="control-value">{parameters.diffusionRate}</span>
           </label>
+          {activeTooltip === 'diffusionRate' && (
+            <div style={{
+              fontSize: '11px',
+              background: 'rgba(139, 92, 246, 0.1)',
+              border: '1px solid rgba(139, 92, 246, 0.3)',
+              borderRadius: '6px',
+              padding: '8px',
+              marginBottom: '8px',
+              color: 'rgba(255,255,255,0.9)',
+              lineHeight: 1.4
+            }}>
+              {tooltips.diffusionRate}
+            </div>
+          )}
           <div className="range-container">
             <input
               type="range"
@@ -502,11 +732,34 @@ export const ControlPanel: React.FC = () => {
 
         {/* Release Rate */}
         <div className="control-group">
-          <label className="control-label">
-            <Droplets style={{ width: '14px', height: '14px', marginRight: '4px' }} />
-            Release Rate
+          <label className="control-label" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+              <Droplets style={{ width: '14px', height: '14px', marginRight: '4px' }} />
+              Release Rate
+            </div>
+            <button
+              onClick={() => setActiveTooltip(activeTooltip === 'releaseRate' ? null : 'releaseRate')}
+              style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex' }}
+              title="Learn more"
+            >
+              <Info size={14} color="#8b5cf6" />
+            </button>
             <span className="control-value">{parameters.releaseRate}</span>
           </label>
+          {activeTooltip === 'releaseRate' && (
+            <div style={{
+              fontSize: '11px',
+              background: 'rgba(139, 92, 246, 0.1)',
+              border: '1px solid rgba(139, 92, 246, 0.3)',
+              borderRadius: '6px',
+              padding: '8px',
+              marginBottom: '8px',
+              color: 'rgba(255,255,255,0.9)',
+              lineHeight: 1.4
+            }}>
+              {tooltips.releaseRate}
+            </div>
+          )}
           <div className="range-container">
             <input
               type="range"

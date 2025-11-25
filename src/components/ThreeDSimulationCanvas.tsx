@@ -3,6 +3,7 @@ import { useSimulationStore } from '../stores/simulationStore';
 import { GRID_SIZE, POLLUTANT_TYPES } from '../types';
 import { FluidDynamics } from '../physics/FluidDynamics';
 import * as THREE from 'three';
+import { Camera } from 'lucide-react';
 
 const PARTICLE_COUNT = 5000;
 const PARTICLE_SIZE = 0.15;
@@ -33,6 +34,25 @@ export const ThreeDSimulationCanvas: React.FC = () => {
 
   const { sources, parameters, isRunning, gpuEnabled, scientistMode, isDrawingObstacles, obstacles, dynamicWeather, actions } = useSimulationStore();
   const [currentAQI, setCurrentAQI] = useState(0);
+
+  const captureScreenshot = useCallback(() => {
+    if (!rendererRef.current || !sceneRef.current || !cameraRef.current) return;
+
+    // Render one more frame to ensure latest state
+    rendererRef.current.render(sceneRef.current, cameraRef.current);
+
+    // Get the canvas as data URL
+    const canvas = rendererRef.current.domElement;
+    const dataURL = canvas.toDataURL('image/png');
+
+    // Download it
+    const a = document.createElement('a');
+    a.href = dataURL;
+    a.download = `pollution-simulation-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }, []);
 
   const initThreeJS = useCallback(() => {
     if (!containerRef.current) return;
@@ -505,6 +525,42 @@ export const ThreeDSimulationCanvas: React.FC = () => {
         background: 'linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 100%)',
       }}
     >
+      {/* Screenshot Button */}
+      <button
+        onClick={captureScreenshot}
+        style={{
+          position: 'absolute',
+          top: '1rem',
+          left: '1rem',
+          background: 'rgba(139, 92, 246, 0.2)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(139, 92, 246, 0.4)',
+          borderRadius: '8px',
+          padding: '8px 12px',
+          color: 'white',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          fontSize: '13px',
+          fontWeight: 600,
+          zIndex: 100,
+          transition: 'all 0.2s ease'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = 'rgba(139, 92, 246, 0.3)';
+          e.currentTarget.style.transform = 'translateY(-2px)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'rgba(139, 92, 246, 0.2)';
+          e.currentTarget.style.transform = 'translateY(0)';
+        }}
+        title="Capture simulation screenshot"
+      >
+        <Camera size={16} />
+        <span>Capture</span>
+      </button>
+
       {/* Air Quality Emoji Overlay - Hidden in Scientist Mode */}
       {isRunning && !scientistMode && (
         <div className="canvas-aqi-indicator">
