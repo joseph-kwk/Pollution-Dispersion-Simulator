@@ -1,18 +1,33 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { useSimulationStore } from '../stores/simulationStore';
 import { POLLUTANT_TYPES, GRID_SIZE } from '../types';
-import { Play, Pause, RotateCcw, Wind, Waves, Droplets, Plus, Trash2, Download, Upload, FileJson, Square } from 'lucide-react';
+import { Play, Pause, RotateCcw, Wind, Waves, Droplets, Plus, Trash2, Download, Upload, FileJson, Square, CheckCircle, AlertCircle, X } from 'lucide-react';
 
 export const ControlPanel: React.FC = () => {
   const { isRunning, parameters, sources, gpuEnabled, scientistMode, isDrawingObstacles, actions } = useSimulationStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importedConfig, setImportedConfig] = useState<any>(null);
 
   const handleExport = () => {
+    setShowExportModal(true);
+  };
+
+  const confirmExport = () => {
     const config = {
+      metadata: {
+        name: 'Pollution Simulation Configuration',
+        description: 'Saved simulation parameters and pollution sources',
+        timestamp: new Date().toISOString(),
+        version: '1.0'
+      },
       parameters,
       sources,
-      timestamp: new Date().toISOString(),
-      version: '1.0'
+      settings: {
+        gpuEnabled,
+        scientistMode
+      }
     };
     const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -23,6 +38,7 @@ export const ControlPanel: React.FC = () => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    setShowExportModal(false);
   };
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -34,26 +50,35 @@ export const ControlPanel: React.FC = () => {
       try {
         const config = JSON.parse(e.target?.result as string);
         if (config.parameters && config.sources) {
-          actions.updateParameters(config.parameters);
-          // Clear existing sources and add new ones
-          // Note: We need to handle this carefully in the store, but for now we'll just reset and add
-          actions.reset();
-          setTimeout(() => {
-            actions.updateParameters(config.parameters);
-            // Remove default source
-            actions.removeSource(0);
-            // Add imported sources
-            config.sources.forEach((source: any) => actions.addSource(source));
-          }, 100);
+          setImportedConfig(config);
+          setShowImportModal(true);
+        } else {
+          alert('Invalid configuration file: Missing required fields');
         }
       } catch (error) {
         console.error('Failed to import configuration:', error);
-        alert('Invalid configuration file');
+        alert('Invalid configuration file: Unable to parse JSON');
       }
     };
     reader.readAsText(file);
-    // Reset input
     event.target.value = '';
+  };
+
+  const confirmImport = () => {
+    if (!importedConfig) return;
+    
+    actions.reset();
+    setTimeout(() => {
+      actions.updateParameters(importedConfig.parameters);
+      actions.removeSource(0);
+      importedConfig.sources.forEach((source: any) => actions.addSource(source));
+      if (importedConfig.settings) {
+        if (importedConfig.settings.gpuEnabled !== gpuEnabled) actions.toggleGPU();
+        if (importedConfig.settings.scientistMode !== scientistMode) actions.toggleScientistMode();
+      }
+      setShowImportModal(false);
+      setImportedConfig(null);
+    }, 100);
   };
 
   return (
@@ -91,6 +116,175 @@ export const ControlPanel: React.FC = () => {
           />
         </div>
       </div>
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.7)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+            borderRadius: '16px',
+            padding: '24px',
+            maxWidth: '500px',
+            width: '90%',
+            border: '1px solid rgba(139, 92, 246, 0.3)',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.5)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <FileJson size={24} color="#8b5cf6" />
+              <h3 style={{ margin: 0, color: 'white', fontSize: '18px' }}>Export Configuration</h3>
+            </div>
+            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '16px', borderRadius: '8px', marginBottom: '16px' }}>
+              <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginBottom: '12px' }}>
+                <strong style={{ color: 'white' }}>What will be saved:</strong>
+              </div>
+              <div style={{ display: 'grid', gap: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.8)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <CheckCircle size={14} color="#10b981" />
+                  <span>{sources.length} Pollution Source{sources.length !== 1 ? 's' : ''}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <CheckCircle size={14} color="#10b981" />
+                  <span>Wind: {parameters.windDirection}° at speed {parameters.windSpeed}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <CheckCircle size={14} color="#10b981" />
+                  <span>Diffusion Rate: {parameters.diffusionRate}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <CheckCircle size={14} color="#10b981" />
+                  <span>Release Rate: {parameters.releaseRate}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <CheckCircle size={14} color="#10b981" />
+                  <span>Settings: GPU {gpuEnabled ? 'Enabled' : 'Disabled'}, Scientist Mode {scientistMode ? 'On' : 'Off'}</span>
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button 
+                className="btn btn-secondary"
+                onClick={() => setShowExportModal(false)}
+                style={{ padding: '8px 16px' }}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn btn-primary"
+                onClick={confirmExport}
+                style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Download size={14} />
+                Download JSON
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Modal */}
+      {showImportModal && importedConfig && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.7)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+            borderRadius: '16px',
+            padding: '24px',
+            maxWidth: '500px',
+            width: '90%',
+            border: '1px solid rgba(139, 92, 246, 0.3)',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.5)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <Upload size={24} color="#8b5cf6" />
+              <h3 style={{ margin: 0, color: 'white', fontSize: '18px' }}>Import Configuration</h3>
+            </div>
+            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '16px', borderRadius: '8px', marginBottom: '16px' }}>
+              <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginBottom: '12px' }}>
+                <strong style={{ color: 'white' }}>Configuration Preview:</strong>
+              </div>
+              <div style={{ display: 'grid', gap: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.8)' }}>
+                {importedConfig.metadata && (
+                  <>
+                    <div style={{ color: '#8b5cf6', fontWeight: 600, marginBottom: '4px' }}>
+                      {importedConfig.metadata.name}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', marginBottom: '8px' }}>
+                      Saved: {new Date(importedConfig.metadata.timestamp).toLocaleString()}
+                    </div>
+                  </>
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <CheckCircle size={14} color="#10b981" />
+                  <span>{importedConfig.sources?.length || 0} Pollution Source{importedConfig.sources?.length !== 1 ? 's' : ''}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <CheckCircle size={14} color="#10b981" />
+                  <span>Wind: {importedConfig.parameters?.windDirection}° at speed {importedConfig.parameters?.windSpeed}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <CheckCircle size={14} color="#10b981" />
+                  <span>Diffusion: {importedConfig.parameters?.diffusionRate}, Release: {importedConfig.parameters?.releaseRate}</span>
+                </div>
+              </div>
+            </div>
+            <div style={{ 
+              background: 'rgba(251, 191, 36, 0.1)', 
+              border: '1px solid rgba(251, 191, 36, 0.3)',
+              padding: '12px',
+              borderRadius: '8px',
+              marginBottom: '16px',
+              display: 'flex',
+              gap: '8px',
+              alignItems: 'flex-start'
+            }}>
+              <AlertCircle size={16} color="#fbbf24" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.9)' }}>
+                This will replace your current simulation settings. Make sure to save your current configuration if needed.
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button 
+                className="btn btn-secondary"
+                onClick={() => { setShowImportModal(false); setImportedConfig(null); }}
+                style={{ padding: '8px 16px' }}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn btn-primary"
+                onClick={confirmImport}
+                style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <CheckCircle size={14} />
+                Apply Configuration
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Performance Section */}
       <div className="control-section" data-tour="settings-section">
