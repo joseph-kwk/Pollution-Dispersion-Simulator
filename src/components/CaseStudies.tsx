@@ -32,7 +32,8 @@ const CASE_STUDIES: CaseStudy[] = [
       diffusionRate: 0.25,
       releaseRate: 5,
       viscosity: 0.8,
-      decayFactor: 0.98
+      decayFactor: 0.98,
+      simulationSpeed: 1.0
     },
     sourceConfig: [
       { x: 40, y: 40, type: 'THERMAL' }
@@ -52,7 +53,8 @@ const CASE_STUDIES: CaseStudy[] = [
       diffusionRate: 0.15,
       releaseRate: 15,
       viscosity: 1.0,
-      decayFactor: 0.994
+      decayFactor: 0.994,
+      simulationSpeed: 1.0
     },
     sourceConfig: [
       { x: 30, y: 40, type: 'CHEMICAL' },
@@ -73,7 +75,8 @@ const CASE_STUDIES: CaseStudy[] = [
       diffusionRate: 0.08,
       releaseRate: 35,
       viscosity: 1.5,
-      decayFactor: 0.988
+      decayFactor: 0.988,
+      simulationSpeed: 1.0
     },
     sourceConfig: [
       { x: 40, y: 20, type: 'CHEMICAL' }
@@ -93,7 +96,8 @@ const CASE_STUDIES: CaseStudy[] = [
       diffusionRate: 0.2,
       releaseRate: 25,
       viscosity: 0.7,
-      decayFactor: 0.99
+      decayFactor: 0.99,
+      simulationSpeed: 1.0
     },
     sourceConfig: [
       { x: 30, y: 40, type: 'THERMAL' }
@@ -113,7 +117,8 @@ const CASE_STUDIES: CaseStudy[] = [
       diffusionRate: 0.1,
       releaseRate: 30,
       viscosity: 2.0,
-      decayFactor: 0.985
+      decayFactor: 0.985,
+      simulationSpeed: 1.0
     },
     sourceConfig: [
       { x: 25, y: 40, type: 'OIL' },
@@ -134,7 +139,8 @@ const CASE_STUDIES: CaseStudy[] = [
       diffusionRate: 0.18,
       releaseRate: 18,
       viscosity: 1.1,
-      decayFactor: 0.992
+      decayFactor: 0.992,
+      simulationSpeed: 1.0
     },
     sourceConfig: [
       { x: 40, y: 60, type: 'SEWAGE' }
@@ -154,7 +160,8 @@ const CASE_STUDIES: CaseStudy[] = [
       diffusionRate: 0.05,
       releaseRate: 50,
       viscosity: 2.5,
-      decayFactor: 0.98
+      decayFactor: 0.98,
+      simulationSpeed: 1.0
     },
     sourceConfig: [
       { x: 30, y: 30, type: 'CHEMICAL' },

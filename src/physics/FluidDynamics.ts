@@ -3,13 +3,12 @@ import { WebGLSimulationEngine } from './WebGLSimulationEngine';
 
 export class FluidDynamics {
   private gridSize: number;
-  private dt: number = 0.1; // Increased time step for more visible effect
+  private baseDt: number = 0.1; // Base time step
+  private dt: number = 0.1; // Current time step
 
   // Velocity fields
   private u!: number[][]; // x-velocity
   private v!: number[][]; // y-velocity
-  private uPrev!: number[][]; // previous x-velocity
-  private vPrev!: number[][]; // previous y-velocity
 
   // Density field (pollution)
   private density!: number[][];
@@ -43,8 +42,6 @@ export class FluidDynamics {
     const size = this.gridSize;
     this.u = Array(size).fill(0).map(() => Array(size).fill(0));
     this.v = Array(size).fill(0).map(() => Array(size).fill(0));
-    this.uPrev = Array(size).fill(0).map(() => Array(size).fill(0));
-    this.vPrev = Array(size).fill(0).map(() => Array(size).fill(0));
     this.density = Array(size).fill(0).map(() => Array(size).fill(0));
     this.densityPrev = Array(size).fill(0).map(() => Array(size).fill(0));
     this.obstacles = Array(size).fill(0).map(() => Array(size).fill(false));
@@ -180,6 +177,9 @@ export class FluidDynamics {
 
   // Main simulation step
   step(parameters: SimulationParameters, sources: PollutionSource[] = []): void {
+    // Update time step based on simulation speed
+    this.dt = this.baseDt * (parameters.simulationSpeed || 1.0);
+
     if (this.useGPU && this.gpuEngine) {
       // Use GPU acceleration
       this.gpuEngine.simulateFrame(this.density, parameters, sources, this.obstacles, { readback: true });

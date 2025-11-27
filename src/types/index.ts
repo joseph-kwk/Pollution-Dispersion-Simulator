@@ -11,6 +11,7 @@ export interface SimulationParameters {
   releaseRate: number;
   viscosity: number;
   decayFactor: number;
+  simulationSpeed: number;
 }
 
 export interface PollutantType {

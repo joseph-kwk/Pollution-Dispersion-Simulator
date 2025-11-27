@@ -28,7 +28,8 @@ const initialParameters: SimulationParameters = {
   diffusionRate: 0.15,
   releaseRate: 20,
   viscosity: 1.0,
-  decayFactor: 0.992
+  decayFactor: 0.992,
+  simulationSpeed: 1.0
 };
 
 const createInitialGrid = (): number[][] =>

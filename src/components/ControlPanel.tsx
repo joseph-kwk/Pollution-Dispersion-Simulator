@@ -35,7 +35,8 @@ export const ControlPanel: React.FC = () => {
     releaseRate: 'Amount of pollution emitted per time step. Higher values create more intense pollution clouds.',
     viscosity: 'Fluid "thickness" that resists flow. Higher viscosity = slower, more stable dispersion patterns.',
     decayFactor: 'Natural breakdown rate of pollutants over time. Values closer to 1 = slower decay. Simulates chemical breakdown or settling.',
-    pollutantType: 'Different pollutants behave differently: oils float, chemicals sink, thermal pollution rises. Each has unique dispersion physics.'
+    pollutantType: 'Different pollutants behave differently: oils float, chemicals sink, thermal pollution rises. Each has unique dispersion physics.',
+    simulationSpeed: 'Controls how fast time passes in the simulation. Higher values = faster movement and spread.'
   };
 
   const handleShare = () => {
@@ -549,6 +550,45 @@ export const ControlPanel: React.FC = () => {
             <RotateCcw style={{ width: '16px', height: '16px' }} />
             Reset
           </button>
+        </div>
+
+        {/* Simulation Speed */}
+        <div className="control-group">
+          <label className="control-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span>Simulation Speed: {parameters.simulationSpeed?.toFixed(1)}x</span>
+            <button
+              onClick={() => setActiveTooltip(activeTooltip === 'simulationSpeed' ? null : 'simulationSpeed')}
+              style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex' }}
+              title="Learn more"
+            >
+              <Info size={14} color="#8b5cf6" />
+            </button>
+          </label>
+          {activeTooltip === 'simulationSpeed' && (
+            <div style={{
+              fontSize: '11px',
+              background: 'rgba(139, 92, 246, 0.1)',
+              border: '1px solid rgba(139, 92, 246, 0.3)',
+              borderRadius: '6px',
+              padding: '8px',
+              marginBottom: '8px',
+              color: 'rgba(255,255,255,0.9)',
+              lineHeight: 1.4
+            }}>
+              {tooltips.simulationSpeed}
+            </div>
+          )}
+          <div className="range-container">
+            <input
+              type="range"
+              className="range-input"
+              min="0.1"
+              max="5.0"
+              step="0.1"
+              value={parameters.simulationSpeed || 1.0}
+              onChange={(e) => actions.updateParameters({ simulationSpeed: Number(e.target.value) })}
+            />
+          </div>
         </div>
 
         {/* Pollution Type */}
