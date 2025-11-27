@@ -3,7 +3,7 @@ import { WebGLSimulationEngine } from './WebGLSimulationEngine';
 
 export class FluidDynamics {
   private gridSize: number;
-  private dt: number = 0.016; // ~60fps
+  private dt: number = 0.1; // Increased time step for more visible effect
 
   // Velocity fields
   private u!: number[][]; // x-velocity
@@ -84,19 +84,26 @@ export class FluidDynamics {
   addDensitySource(x: number, y: number, amount: number): void {
     if (x >= 0 && x < this.gridSize && y >= 0 && y < this.gridSize) {
       this.density[y][x] += amount;
+      if (this.density[y][x] > 255) this.density[y][x] = 255;
     }
   }
 
   // Set velocity field (wind)
   setVelocityField(windDirection: number, windSpeed: number): void {
     const angleRad = (windDirection * Math.PI) / 180;
-    const baseVelX = windSpeed * Math.cos(angleRad);
-    const baseVelY = windSpeed * Math.sin(angleRad);
+    const speed = windSpeed * 2.0; // Scale for visibility
+    const baseVelX = speed * Math.cos(angleRad);
+    const baseVelY = speed * Math.sin(angleRad);
 
     for (let i = 0; i < this.gridSize; i++) {
       for (let j = 0; j < this.gridSize; j++) {
-        this.u[i][j] = baseVelX;
-        this.v[i][j] = baseVelY;
+        if (!this.obstacles[i][j]) {
+          this.u[i][j] = baseVelX;
+          this.v[i][j] = baseVelY;
+        } else {
+          this.u[i][j] = 0;
+          this.v[i][j] = 0;
+        }
       }
     }
   }
@@ -105,6 +112,11 @@ export class FluidDynamics {
   private advect(field: number[][], fieldPrev: number[][], u: number[][], v: number[][]): void {
     for (let i = 1; i < this.gridSize - 1; i++) {
       for (let j = 1; j < this.gridSize - 1; j++) {
+        if (this.obstacles[i][j]) {
+          field[i][j] = 0;
+          continue;
+        }
+
         // Trace back particle
         const x = j - this.dt * u[i][j];
         const y = i - this.dt * v[i][j];
@@ -121,18 +133,10 @@ export class FluidDynamics {
         const t0 = 1 - t1;
 
         let val = 0;
-        if (x0 >= 0 && x0 < this.gridSize && y0 >= 0 && y0 < this.gridSize) {
-          val += s0 * t0 * fieldPrev[y0][x0];
-        }
-        if (x1 >= 0 && x1 < this.gridSize && y0 >= 0 && y0 < this.gridSize) {
-          val += s1 * t0 * fieldPrev[y0][x1];
-        }
-        if (x0 >= 0 && x0 < this.gridSize && y1 >= 0 && y1 < this.gridSize) {
-          val += s0 * t1 * fieldPrev[y1][x0];
-        }
-        if (x1 >= 0 && x1 < this.gridSize && y1 >= 0 && y1 < this.gridSize) {
-          val += s1 * t1 * fieldPrev[y1][x1];
-        }
+        if (x0 >= 0 && x0 < this.gridSize && y0 >= 0 && y0 < this.gridSize) val += s0 * t0 * fieldPrev[y0][x0];
+        if (x1 >= 0 && x1 < this.gridSize && y0 >= 0 && y0 < this.gridSize) val += s1 * t0 * fieldPrev[y0][x1];
+        if (x0 >= 0 && x0 < this.gridSize && y1 >= 0 && y1 < this.gridSize) val += s0 * t1 * fieldPrev[y1][x0];
+        if (x1 >= 0 && x1 < this.gridSize && y1 >= 0 && y1 < this.gridSize) val += s1 * t1 * fieldPrev[y1][x1];
 
         field[i][j] = val;
       }
@@ -150,6 +154,8 @@ export class FluidDynamics {
             field[i][j] = (fieldPrev[i][j] +
                           a * (field[i-1][j] + field[i+1][j] +
                                field[i][j-1] + field[i][j+1])) / (1 + 4 * a);
+          } else {
+            field[i][j] = 0;
           }
         }
       }
@@ -158,13 +164,18 @@ export class FluidDynamics {
 
   // Set boundary conditions
   private setBoundaryConditions(field: number[][], type: 'velocity' | 'density'): void {
-    // Simple boundary conditions - zero at edges
     for (let i = 0; i < this.gridSize; i++) {
-      field[i][0] = type === 'velocity' ? 0 : field[i][1];
-      field[i][this.gridSize - 1] = type === 'velocity' ? 0 : field[i][this.gridSize - 2];
-      field[0][i] = type === 'velocity' ? 0 : field[1][i];
-      field[this.gridSize - 1][i] = type === 'velocity' ? 0 : field[this.gridSize - 2][i];
+      field[i][0] = type === 'velocity' ? -field[i][1] : field[i][1];
+      field[i][this.gridSize - 1] = type === 'velocity' ? -field[i][this.gridSize - 2] : field[i][this.gridSize - 2];
+      field[0][i] = type === 'velocity' ? -field[1][i] : field[1][i];
+      field[this.gridSize - 1][i] = type === 'velocity' ? -field[this.gridSize - 2][i] : field[this.gridSize - 2][i];
     }
+    
+    // Corners
+    field[0][0] = 0.5 * (field[1][0] + field[0][1]);
+    field[0][this.gridSize-1] = 0.5 * (field[1][this.gridSize-1] + field[0][this.gridSize-2]);
+    field[this.gridSize-1][0] = 0.5 * (field[this.gridSize-2][0] + field[this.gridSize-1][1]);
+    field[this.gridSize-1][this.gridSize-1] = 0.5 * (field[this.gridSize-2][this.gridSize-1] + field[this.gridSize-1][this.gridSize-2]);
   }
 
   // Main simulation step
@@ -180,7 +191,7 @@ export class FluidDynamics {
 
   // CPU-based simulation (original implementation)
   private cpuStep(parameters: SimulationParameters, sources: PollutionSource[]): void {
-    // Add pollution at sources
+    // 1. Add pollution at sources
     sources.forEach((source: PollutionSource) => {
       if (source.active && source.x >= 0 && source.y >= 0 &&
           source.x < this.gridSize && source.y < this.gridSize) {
@@ -188,57 +199,28 @@ export class FluidDynamics {
       }
     });
 
-    // Set velocity field based on wind parameters
+    // 2. Set velocity field based on wind parameters
     this.setVelocityField(parameters.windDirection, parameters.windSpeed);
 
-    // Swap buffers
-    [this.u, this.uPrev] = [this.uPrev, this.u];
-    [this.v, this.vPrev] = [this.vPrev, this.v];
+    // 3. Diffuse Density
+    // Swap buffers so densityPrev has current state (with sources), density is target
     [this.density, this.densityPrev] = [this.densityPrev, this.density];
-
-    // Advect velocity
-    this.advect(this.u, this.uPrev, this.uPrev, this.vPrev);
-    this.advect(this.v, this.vPrev, this.uPrev, this.vPrev);
-    this.setBoundaryConditions(this.u, 'velocity');
-    this.setBoundaryConditions(this.v, 'velocity');
-
-    // Diffuse velocity
-    this.diffuse(this.u, this.uPrev, parameters.viscosity);
-    this.diffuse(this.v, this.vPrev, parameters.viscosity);
-    this.setBoundaryConditions(this.u, 'velocity');
-    this.setBoundaryConditions(this.v, 'velocity');
-
-    // Advect density
-    this.advect(this.density, this.densityPrev, this.u, this.v);
-    this.setBoundaryConditions(this.density, 'density');
-
-    // Diffuse density
     this.diffuse(this.density, this.densityPrev, parameters.diffusionRate);
     this.setBoundaryConditions(this.density, 'density');
 
-    // Apply decay
+    // 4. Advect Density
+    // Swap buffers so densityPrev has diffused state, density is target
+    [this.density, this.densityPrev] = [this.densityPrev, this.density];
+    this.advect(this.density, this.densityPrev, this.u, this.v);
+    this.setBoundaryConditions(this.density, 'density');
+
+    // 5. Apply decay
     for (let i = 0; i < this.gridSize; i++) {
       for (let j = 0; j < this.gridSize; j++) {
         this.density[i][j] *= parameters.decayFactor;
         this.density[i][j] = Math.max(0, Math.min(255, this.density[i][j]));
       }
     }
-
-    // Note: For full Navier-Stokes, we would need to compute pressure and project
-    // But for pollution dispersion, advection + diffusion + decay is often sufficient
-    // Uncomment below for full incompressible fluid simulation
-
-    // Compute divergence
-    // const div = Array(this.gridSize).fill(0).map(() => Array(this.gridSize).fill(0));
-    // this.computeDivergence(this.u, this.v, div);
-
-    // Compute pressure
-    // this.computePressure(this.pressure, div);
-
-    // Subtract pressure gradient
-    // this.subtractPressureGradient(this.u, this.v, this.pressure);
-    // this.setBoundaryConditions(this.u, 'velocity');
-    // this.setBoundaryConditions(this.v, 'velocity');
   }
 
   // Reset simulation

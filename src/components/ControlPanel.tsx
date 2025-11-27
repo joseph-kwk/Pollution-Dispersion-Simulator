@@ -1,7 +1,8 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useSimulationStore } from '../stores/simulationStore';
+import { useShareableURL } from '../hooks/useShareableURL';
 import { POLLUTANT_TYPES, GRID_SIZE } from '../types';
-import { Play, Pause, RotateCcw, Wind, Waves, Droplets, Plus, Trash2, Download, Upload, FileJson, Square, CheckCircle, AlertCircle, X, Info, Keyboard } from 'lucide-react';
+import { Play, Pause, RotateCcw, Wind, Waves, Droplets, Plus, Trash2, Download, Upload, FileJson, Square, CheckCircle, AlertCircle, X, Info, Keyboard, Share2 } from 'lucide-react';
 
 export const ControlPanel: React.FC = () => {
   const { isRunning, parameters, sources, gpuEnabled, scientistMode, isDrawingObstacles, actions } = useSimulationStore();
@@ -11,6 +12,8 @@ export const ControlPanel: React.FC = () => {
   const [importedConfig, setImportedConfig] = useState<any>(null);
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
+  const [showShareTooltip, setShowShareTooltip] = useState(false);
+  const { generateShareURL } = useShareableURL();
 
   useEffect(() => {
     const handleKeyboardSave = () => setShowExportModal(true);
@@ -33,6 +36,14 @@ export const ControlPanel: React.FC = () => {
     viscosity: 'Fluid "thickness" that resists flow. Higher viscosity = slower, more stable dispersion patterns.',
     decayFactor: 'Natural breakdown rate of pollutants over time. Values closer to 1 = slower decay. Simulates chemical breakdown or settling.',
     pollutantType: 'Different pollutants behave differently: oils float, chemicals sink, thermal pollution rises. Each has unique dispersion physics.'
+  };
+
+  const handleShare = () => {
+    const url = generateShareURL();
+    navigator.clipboard.writeText(url).then(() => {
+      setShowShareTooltip(true);
+      setTimeout(() => setShowShareTooltip(false), 2000);
+    });
   };
 
   const handleExport = () => {
@@ -131,6 +142,32 @@ export const ControlPanel: React.FC = () => {
           >
             <Upload style={{ width: '16px', height: '16px' }} />
             Load
+          </button>
+          <button 
+            className="btn btn-secondary ripple scale-hover"
+            onClick={handleShare}
+            title="Share simulation URL"
+            style={{ position: 'relative' }}
+          >
+            <Share2 style={{ width: '16px', height: '16px' }} />
+            Share
+            {showShareTooltip && (
+              <span style={{
+                position: 'absolute',
+                top: '-30px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                background: '#10b981',
+                color: 'white',
+                padding: '4px 8px',
+                borderRadius: '4px',
+                fontSize: '10px',
+                whiteSpace: 'nowrap',
+                pointerEvents: 'none'
+              }}>
+                Copied!
+              </span>
+            )}
           </button>
         </div>
         <button 

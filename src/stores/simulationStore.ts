@@ -8,6 +8,7 @@ interface SimulationStore extends SimulationState {
     reset: () => void;
     updateParameters: (params: Partial<SimulationParameters>) => void;
     addSource: (source: Omit<PollutionSource, 'active'>) => void;
+    setSources: (sources: PollutionSource[]) => void;
     removeSource: (index: number) => void;
     toggleGPU: () => void;
     toggleScientistMode: () => void;
@@ -77,6 +78,7 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
     addSource: (source) => set((state) => ({
       sources: [...state.sources, { ...source, active: true }]
     })),
+    setSources: (sources) => set({ sources }),
     removeSource: (index) => set((state) => ({
       sources: state.sources.filter((_, i) => i !== index)
     })),
