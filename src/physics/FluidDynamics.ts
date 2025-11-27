@@ -21,16 +21,23 @@ export class FluidDynamics {
   private gpuEngine: WebGLSimulationEngine | null = null;
   private useGPU: boolean = false;
 
-  constructor(gridSize: number = GRID_SIZE, canvas?: HTMLCanvasElement) {
+  constructor(gridSize: number = GRID_SIZE) {
     this.gridSize = gridSize;
     this.initializeFields();
 
     // Try to initialize GPU acceleration
-    if (canvas && WebGLSimulationEngine.isSupported()) {
+    if (WebGLSimulationEngine.isSupported()) {
       try {
-        this.gpuEngine = new WebGLSimulationEngine(canvas, gridSize);
-        this.useGPU = true;
-        console.log('GPU acceleration enabled');
+        // Create a dedicated canvas for GPU physics if one isn't provided
+        // This avoids context conflicts with Three.js
+        const gpuCanvas = document.createElement('canvas');
+        gpuCanvas.width = gridSize;
+        gpuCanvas.height = gridSize;
+        
+        this.gpuEngine = new WebGLSimulationEngine(gpuCanvas, gridSize);
+        // Don't auto-enable GPU, let the store control it via setGPUEnabled
+        // this.useGPU = true; 
+        console.log('GPU acceleration initialized successfully');
       } catch (error) {
         console.warn('GPU acceleration failed to initialize:', error);
         this.useGPU = false;
