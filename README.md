@@ -4,6 +4,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-18.2-blue.svg)](https://reactjs.org/)
 [![WebGL2](https://img.shields.io/badge/WebGL2-Supported-green.svg)](https://www.khronos.org/webgl/)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fjoseph-kwk%2FPollution-Dispersion-Simulator)
 
 An advanced, real-time pollution dispersion simulation tool built with modern web technologies. This application models how pollutants spread in fluid environments using scientifically accurate Navier-Stokes physics and GPU acceleration.
 
