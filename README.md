@@ -29,11 +29,31 @@ An advanced, real-time pollution dispersion simulation tool built with modern we
 - **Scenario Saving/Loading**: Save and restore simulation states
 - **Dark/Light Theme**: Modern UI with theme switching
 
-### **📊 Technical Excellence**
-- **React 18 + TypeScript 5**: Modern, type-safe architecture
-- **Zustand State Management**: Lightweight, scalable state solution
-- **Three.js Integration**: 3D visualization capabilities
-- **Vite Build System**: Fast development and optimized production builds
+## 🛠️ **Technologies & Tools**
+
+This project leverages a modern stack to ensure performance, maintainability, and developer experience:
+
+### **Core & Architecture**
+- **[Vite](https://vitejs.dev/)**: The build tool and development server. Chosen for its lightning-fast HMR (Hot Module Replacement) and optimized production builds using Rollup.
+- **[React 18](https://react.dev/)**: The library for web and native user interfaces.
+- **[TypeScript](https://www.typescriptlang.org/)**: Strongly typed JavaScript for robust and maintainable code.
+
+### **State & Logic**
+- **[Zustand](https://docs.pmnd.rs/zustand/getting-started/introduction)**: A small, fast, and scalable bearbones state-management solution.
+- **Custom Physics Engine**: A dedicated fluid dynamics solver implementing Navier-Stokes equations.
+
+### **Graphics & UI**
+- **[WebGL2](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API)**: For high-performance, GPU-accelerated rendering of fluid simulations.
+- **[Three.js](https://threejs.org/)**: Used for advanced visualization capabilities.
+- **[Lucide React](https://lucide.dev/)**: Beautiful, consistent, and lightweight icons.
+
+### **Testing & Quality**
+- **[Jest](https://jestjs.io/)**: A delightful JavaScript Testing Framework with a focus on simplicity.
+- **[ESLint](https://eslint.org/)**: Statically analyzes code to quickly find problems.
+
+### **Deployment**
+- **[Vercel](https://vercel.com/)**: Platform for frontend frameworks and static sites, providing seamless deployment and analytics.
+- **[@vercel/analytics](https://vercel.com/analytics)**: Privacy-friendly, real-time visitor insights.
 
 ## 🚀 **Quick Start**
 
