@@ -8,13 +8,18 @@ export const PollutionInsights: React.FC = () => {
   const [aqiHistory, setAqiHistory] = useState<number[]>(new Array(60).fill(0));
   const [showReportModal, setShowReportModal] = useState(false);
 
-  // Calculate total pollution
+  // Calculate total pollution and max pollution for AQI
   const totalPollution = grid.reduce((sum, row) => 
     sum + row.reduce((rowSum, cell) => rowSum + cell, 0), 0
   );
+  
+  const maxPollution = grid.reduce((max, row) => 
+    Math.max(max, ...row), 0
+  );
 
-  // Calculate air quality index (0-500)
-  const aqi = Math.min(500, Math.floor((totalPollution / (grid.length * grid[0].length)) * 2));
+  // Calculate air quality index (0-500) based on peak pollution
+  // Multiplier of 5 ensures that release rates of ~50 result in "Very Unhealthy" to "Hazardous" levels
+  const aqi = Math.min(500, Math.floor(maxPollution * 5));
 
   useEffect(() => {
     const interval = setInterval(() => {

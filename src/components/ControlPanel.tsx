@@ -188,7 +188,6 @@ export const ControlPanel: React.FC = () => {
             onChange={handleImport}
           />
         </div>
-      </div>
 
       {/* Export Modal */}
       {showExportModal && (
