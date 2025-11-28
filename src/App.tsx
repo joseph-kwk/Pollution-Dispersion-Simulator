@@ -8,6 +8,7 @@ import { SimulationCommentary } from './components/SimulationCommentary';
 import { PollutionInsights } from './components/PollutionInsights';
 import { CaseStudies } from './components/CaseStudies';
 import { TourGuide } from './components/TourGuide';
+import { MobileNotice } from './components/MobileNotice';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
 const SimulatorPage: React.FC = () => {
@@ -16,6 +17,7 @@ const SimulatorPage: React.FC = () => {
   return (
     <>
       <TourGuide />
+      <MobileNotice />
       <aside className="sidebar">
       <ControlPanel />
       <PollutionInsights />

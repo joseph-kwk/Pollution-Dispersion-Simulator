@@ -112,7 +112,9 @@ export const SimulationCanvas: React.FC = () => {
     const gridX = Math.floor(x / (canvas.width / GRID_SIZE));
     const gridY = Math.floor(y / (canvas.height / GRID_SIZE));
 
-    if (event.ctrlKey) {
+    // Allow drawing obstacles if Ctrl is pressed OR if "Draw Obstacles" mode is enabled
+    // This ensures mobile users can also place obstacles using the toggle
+    if (event.ctrlKey || useSimulationStore.getState().isDrawingObstacles) {
       const newObstacles = obstacles.map((row, r) =>
         row.map((cell, c) => (r === gridY && c === gridX) ? !cell : cell)
       );

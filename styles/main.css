@@ -1738,12 +1738,39 @@ canvas:hover {
 
 @media (max-width: 768px) {
     .app {
-        grid-template-areas: 
-            "header"
-            "main"
-            "sidebar";
-        grid-template-columns: 1fr;
-        grid-template-rows: 60px 1fr auto;
+        /* Switch to flex column for better mobile scrolling */
+        display: flex;
+        flex-direction: column;
+        height: auto;
+        min-height: 100vh;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+    
+    .header {
+        position: sticky;
+        top: 0;
+        width: 100%;
+        z-index: 1000;
+    }
+
+    .app-main {
+        flex: 0 0 auto;
+        min-height: 60vh;
+        width: 100%;
+        padding: 1rem;
+        overflow: visible;
+    }
+
+    .sidebar {
+        flex: 1 0 auto;
+        width: 100%;
+        height: auto;
+        max-height: none;
+        border-right: none;
+        border-top: 1px solid var(--border-color);
+        overflow: visible;
+        padding-bottom: 2rem;
     }
     
     :root {
@@ -1751,7 +1778,8 @@ canvas:hover {
     }
     
     .simulation-container {
-        max-width: 90vw;
-        aspect-ratio: 1.1;
+        max-width: 100%;
+        aspect-ratio: 1;
+        margin: 0 auto;
     }
 }
