@@ -53,7 +53,8 @@ const initialState: SimulationState = {
   gpuEnabled: false,
   scientistMode: false,
   isDrawingObstacles: false,
-  dynamicWeather: false
+  dynamicWeather: false,
+  resetTrigger: 0
 };
 
 export const useSimulationStore = create<SimulationStore>((set) => ({
@@ -61,7 +62,7 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
   actions: {
     start: () => set({ isRunning: true }),
     pause: () => set({ isRunning: false }),
-    reset: () => set({
+    reset: () => set((state) => ({
       isRunning: false,
       grid: createInitialGrid(),
       obstacles: createInitialObstacles(),
@@ -71,8 +72,9 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
         y: Math.floor(GRID_SIZE / 2),
         type: 'CHEMICAL',
         active: true
-      }]
-    }),
+      }],
+      resetTrigger: state.resetTrigger + 1
+    })),
     updateParameters: (params) => set((state) => ({
       parameters: { ...state.parameters, ...params }
     })),

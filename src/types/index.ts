@@ -48,6 +48,7 @@ export interface SimulationState {
   scientistMode: boolean;
   isDrawingObstacles: boolean;
   dynamicWeather: boolean;
+  resetTrigger: number;
 }
 
 // UI types

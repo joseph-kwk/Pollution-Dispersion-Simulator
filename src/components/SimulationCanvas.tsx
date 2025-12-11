@@ -181,11 +181,12 @@ export const SimulationCanvas: React.FC = () => {
     fluidDynamics.setGPUEnabled(gpuEnabled);
   }, [fluidDynamics, gpuEnabled]);
 
+  // Reset physics engine when resetTrigger changes
   useEffect(() => {
-    if (!isRunning) {
-      fluidDynamics.reset();
-    }
-  }, [fluidDynamics, isRunning]);
+    fluidDynamics.reset();
+    // Also ensure we redraw the empty state
+    draw();
+  }, [fluidDynamics, useSimulationStore.getState().resetTrigger, draw]);
 
   useEffect(() => {
     draw();
