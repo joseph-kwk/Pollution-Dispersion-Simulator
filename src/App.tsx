@@ -4,7 +4,7 @@ import { ThreeDSimulationCanvas } from './components/ThreeDSimulationCanvas';
 import { ControlPanel } from './components/ControlPanel';
 import { Header } from './components/Header';
 import { StatusBar } from './components/StatusBar';
-import { SimulationCommentary } from './components/SimulationCommentary';
+
 import { PollutionInsights } from './components/PollutionInsights';
 import { CaseStudies } from './components/CaseStudies';
 import { TourGuide } from './components/TourGuide';
@@ -13,28 +13,36 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
 const SimulatorPage: React.FC = () => {
   useKeyboardShortcuts();
-  
+
   return (
     <>
       <TourGuide />
       <MobileNotice />
       <aside className="sidebar">
-      <ControlPanel />
-      <PollutionInsights />
-    </aside>
-    <main className="app-main">
-      <SimulationCommentary />
-      <div className="simulation-container">
-        <ThreeDSimulationCanvas />
-      </div>
-    </main>
-  </>
+        <ControlPanel />
+        <PollutionInsights />
+      </aside>
+      <main className="app-main">
+
+        <div className="simulation-container">
+          <ThreeDSimulationCanvas />
+        </div>
+      </main>
+    </>
   );
 };
 
 const CaseStudiesPage: React.FC = () => (
   <main className="app-main case-studies-page">
     <CaseStudies />
+  </main>
+);
+
+import { About } from './components/About';
+
+const AboutPage: React.FC = () => (
+  <main className="app-main about-page-container" style={{ overflow: 'auto' }}>
+    <About />
   </main>
 );
 
@@ -46,6 +54,7 @@ const App: React.FC = () => {
         <Routes>
           <Route path="/" element={<SimulatorPage />} />
           <Route path="/case-studies" element={<CaseStudiesPage />} />
+          <Route path="/about" element={<AboutPage />} />
         </Routes>
         <StatusBar />
       </div>

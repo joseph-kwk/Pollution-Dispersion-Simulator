@@ -45,7 +45,7 @@ const initialState: SimulationState = {
   sources: [{
     x: Math.floor(GRID_SIZE / 2),
     y: Math.floor(GRID_SIZE / 2),
-    type: 'CHEMICAL',
+    type: 'CO2',
     active: true
   }],
   parameters: initialParameters,
@@ -70,7 +70,7 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
       sources: [{
         x: Math.floor(GRID_SIZE / 2),
         y: Math.floor(GRID_SIZE / 2),
-        type: 'CHEMICAL',
+        type: 'CO2',
         active: true
       }],
       resetTrigger: state.resetTrigger + 1

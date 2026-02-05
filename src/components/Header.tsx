@@ -27,26 +27,33 @@ export const Header: React.FC = () => {
             </div>
           </div>
         </Link>
-        
+
         <nav className="main-nav">
-          <Link 
-            to="/" 
+          <Link
+            to="/"
             className={`nav-link ${location.pathname === '/' ? 'active' : ''}`}
           >
             <span className="nav-icon">🎮</span>
             <span>Simulator</span>
           </Link>
-          <Link 
-            to="/case-studies" 
+          <Link
+            to="/case-studies"
             className={`nav-link ${location.pathname === '/case-studies' ? 'active' : ''}`}
             data-tour="case-studies-nav"
           >
             <span className="nav-icon">📚</span>
             <span>Case Studies</span>
           </Link>
+          <Link
+            to="/about"
+            className={`nav-link ${location.pathname === '/about' ? 'active' : ''}`}
+          >
+            <span className="nav-icon">ℹ️</span>
+            <span>About</span>
+          </Link>
         </nav>
       </div>
-      
+
       <div className="header-right">
         <div className="status-indicator">
           <div className="status-dot active"></div>

@@ -22,10 +22,10 @@ interface CaseStudy {
 const CASE_STUDIES: CaseStudy[] = [
   {
     id: 'clean-air',
-    title: '🌤️ Clean Air - Baseline',
-    description: 'Minimal pollution with strong natural dispersion',
+    title: '🌤️ Baseline: Clean Atmosphere',
+    description: 'Reference state with minimal background CO2 and optimal dispersion.',
     severity: 'good',
-    scenario: 'Normal atmospheric conditions with low emissions',
+    scenario: 'Rural environment with good wind circulation and no local emissions.',
     parameters: {
       windDirection: 45,
       windSpeed: 1.2,
@@ -36,17 +36,17 @@ const CASE_STUDIES: CaseStudy[] = [
       simulationSpeed: 1.0
     },
     sourceConfig: [
-      { x: 40, y: 40, type: 'THERMAL' }
+      { x: 40, y: 40, type: 'CO2' }
     ],
-    expectedOutcome: 'Pollution disperses quickly and naturally decays. Air quality remains good.',
-    realWorldExample: 'Rural area with light traffic on a windy day'
+    expectedOutcome: 'Pollutants disperse immediately. AQI remains near 0 (Good).',
+    realWorldExample: 'remote countryside or oceanic air.'
   },
   {
     id: 'urban-morning',
-    title: '🏙️ Urban Morning Rush Hour',
-    description: 'Moderate pollution from commuter traffic',
+    title: '🏙️ Scenario: Urban Rush Hour',
+    description: 'Traffic-related emissions accumulating during morning commute.',
     severity: 'moderate',
-    scenario: 'Multiple emission sources with moderate wind conditions',
+    scenario: 'High-density traffic emitting NO2 and PM2.5 with moderate wind.',
     parameters: {
       windDirection: 90,
       windSpeed: 0.8,
@@ -57,18 +57,18 @@ const CASE_STUDIES: CaseStudy[] = [
       simulationSpeed: 1.0
     },
     sourceConfig: [
-      { x: 30, y: 40, type: 'CHEMICAL' },
-      { x: 50, y: 40, type: 'CHEMICAL' }
+      { x: 30, y: 40, type: 'NO2' },
+      { x: 50, y: 40, type: 'PM25' }
     ],
-    expectedOutcome: 'Pollution accumulates in downwind areas. Air quality degrades to moderate levels.',
-    realWorldExample: 'City center during morning commute - Los Angeles, Beijing'
+    expectedOutcome: 'Brown haze (NO2) forms downwind. AQI rises to Moderate/Unhealthy levels.',
+    realWorldExample: 'Los Angeles or London during peak traffic hours.'
   },
   {
     id: 'industrial-accident',
-    title: '🏭 Industrial Chemical Spill',
-    description: 'Severe chemical release with poor dispersion',
+    title: '⚠️ Scenario: Chemical Plant Leak',
+    description: 'Acute release of localized toxic gas (SO2).',
     severity: 'bad',
-    scenario: 'High-intensity chemical emission with low wind',
+    scenario: 'Sudden valve failure releasing concentrated Sulfur Dioxide in low wind.',
     parameters: {
       windDirection: 180,
       windSpeed: 0.3,
@@ -79,97 +79,77 @@ const CASE_STUDIES: CaseStudy[] = [
       simulationSpeed: 1.0
     },
     sourceConfig: [
-      { x: 40, y: 20, type: 'CHEMICAL' }
+      { x: 40, y: 20, type: 'SO2' }
     ],
-    expectedOutcome: 'Toxic plume spreads slowly, creating hazardous air quality zone.',
-    realWorldExample: 'Bhopal gas tragedy (1984), Chemical plant accidents'
+    expectedOutcome: 'Dense, pungent cloud moves slowly along ground. Hazardous near source.',
+    realWorldExample: 'Industrial accidents involving acid gas releases.'
   },
   {
-    id: 'thermal-pollution',
-    title: '🔥 Power Plant Heat Discharge',
-    description: 'Thermal pollution from industrial cooling',
+    id: 'radon-accumulation',
+    title: '🏠 Scenario: Basement Radon',
+    description: 'Invisible radioactive gas accumulating in enclosed, low spaces.',
     severity: 'moderate',
-    scenario: 'Continuous heat release affecting local climate',
-    parameters: {
-      windDirection: 270,
-      windSpeed: 0.6,
-      diffusionRate: 0.2,
-      releaseRate: 25,
-      viscosity: 0.7,
-      decayFactor: 0.99,
-      simulationSpeed: 1.0
-    },
-    sourceConfig: [
-      { x: 30, y: 40, type: 'THERMAL' }
-    ],
-    expectedOutcome: 'Heat plume creates localized temperature gradient, affecting air quality.',
-    realWorldExample: 'Coastal power plants with cooling water discharge'
-  },
-  {
-    id: 'oil-refinery',
-    title: '🛢️ Oil Refinery Operations',
-    description: 'Persistent oil-based pollutants',
-    severity: 'bad',
-    scenario: 'Heavy oil vapor emissions with poor ventilation',
-    parameters: {
-      windDirection: 135,
-      windSpeed: 0.4,
-      diffusionRate: 0.1,
-      releaseRate: 30,
-      viscosity: 2.0,
-      decayFactor: 0.985,
-      simulationSpeed: 1.0
-    },
-    sourceConfig: [
-      { x: 25, y: 40, type: 'OIL' },
-      { x: 55, y: 40, type: 'OIL' }
-    ],
-    expectedOutcome: 'Thick, persistent pollution cloud with slow decay. Poor air quality.',
-    realWorldExample: 'Houston Ship Channel, Middle East refineries'
-  },
-  {
-    id: 'sewage-treatment',
-    title: '💧 Sewage Treatment Plant',
-    description: 'Organic waste emissions affecting air quality',
-    severity: 'moderate',
-    scenario: 'Biological treatment facility with odor issues',
-    parameters: {
-      windDirection: 0,
-      windSpeed: 0.9,
-      diffusionRate: 0.18,
-      releaseRate: 18,
-      viscosity: 1.1,
-      decayFactor: 0.992,
-      simulationSpeed: 1.0
-    },
-    sourceConfig: [
-      { x: 40, y: 60, type: 'SEWAGE' }
-    ],
-    expectedOutcome: 'Organic pollutants spread downwind, creating odor zones.',
-    realWorldExample: 'Urban wastewater treatment facilities'
-  },
-  {
-    id: 'worst-case',
-    title: '☠️ Environmental Disaster',
-    description: 'Multiple simultaneous pollution sources',
-    severity: 'severe',
-    scenario: 'Industrial zone with no wind and multiple emissions',
+    scenario: 'Ground seepage of Radon with poor ventilation (low diffusion).',
     parameters: {
       windDirection: 0,
       windSpeed: 0.1,
       diffusionRate: 0.05,
-      releaseRate: 50,
-      viscosity: 2.5,
-      decayFactor: 0.98,
+      releaseRate: 12,
+      viscosity: 0.9,
+      decayFactor: 0.995,
       simulationSpeed: 1.0
     },
     sourceConfig: [
-      { x: 30, y: 30, type: 'CHEMICAL' },
-      { x: 50, y: 30, type: 'OIL' },
-      { x: 40, y: 50, type: 'SEWAGE' }
+      { x: 40, y: 50, type: 'RADON' }
     ],
-    expectedOutcome: 'Catastrophic air quality. Pollution stagnates and accumulates to hazardous levels.',
-    realWorldExample: 'Delhi during winter inversion, Severe smog episodes'
+    expectedOutcome: 'Gas sinks and pools at the bottom (basement effect). Silent health risk.',
+    realWorldExample: 'Poorly ventilated basements in radon-prone geological zones.'
+  },
+  {
+    id: 'wildfire-smoke',
+    title: '🔥 Scenario: Wildfire Haze',
+    description: 'Widespread PM2.5 smoke covering a large area.',
+    severity: 'severe',
+    scenario: 'Heavy particulate emission drifting from distance (simulated as wide source).',
+    parameters: {
+      windDirection: 270,
+      windSpeed: 1.5,
+      diffusionRate: 0.3,
+      releaseRate: 40,
+      viscosity: 1.2,
+      decayFactor: 0.998,
+      simulationSpeed: 1.0
+    },
+    sourceConfig: [
+      { x: 20, y: 20, type: 'PM25' },
+      { x: 20, y: 40, type: 'PM25' },
+      { x: 20, y: 60, type: 'PM25' }
+    ],
+    expectedOutcome: 'Blanket of purple haze reduces visibility. Hazardous AQI across entire region.',
+    realWorldExample: 'California or Australian wildfires affecting downwind cities.'
+  },
+  {
+    id: 'thermal-inversion',
+    title: '🌫️ Scenario: Winter Smog (Inversion)',
+    description: 'Pollutants trapped by atmospheric inversion layer.',
+    severity: 'severe',
+    scenario: 'Zero wind and very low diffusion trapping multiple urban pollutants.',
+    parameters: {
+      windDirection: 0,
+      windSpeed: 0.05,
+      diffusionRate: 0.02,
+      releaseRate: 25,
+      viscosity: 1.5,
+      decayFactor: 0.999,
+      simulationSpeed: 1.0
+    },
+    sourceConfig: [
+      { x: 30, y: 30, type: 'NO2' },
+      { x: 50, y: 50, type: 'PM25' },
+      { x: 40, y: 40, type: 'SO2' }
+    ],
+    expectedOutcome: 'Pollution does not disperse. Accumulates rapidly to toxic levels.',
+    realWorldExample: 'The Great Smog of London (1952) or modern day Salt Lake City inversions.'
   }
 ];
 
@@ -190,10 +170,10 @@ export const CaseStudies: React.FC = () => {
 
   const loadCaseStudy = (caseStudy: CaseStudy) => {
     setLoadingStudy(caseStudy.id);
-    
+
     // Reset first
     actions.reset();
-    
+
     // Small delay for visual feedback
     setTimeout(() => {
       // Clear existing sources
@@ -212,7 +192,7 @@ export const CaseStudies: React.FC = () => {
 
       // Navigate to simulator and start
       navigate('/');
-      
+
       setTimeout(() => {
         actions.start();
         setLoadingStudy(null);
@@ -225,7 +205,7 @@ export const CaseStudies: React.FC = () => {
       <div className="case-studies-header">
         <h1>📚 Case Studies & Examples</h1>
         <p className="subtitle">
-          Explore real-world pollution scenarios from best to worst case. 
+          Explore real-world pollution scenarios from best to worst case.
           Click any scenario to load it into the simulator.
         </p>
       </div>
@@ -251,16 +231,16 @@ export const CaseStudies: React.FC = () => {
 
       <div className="case-studies-grid">
         {CASE_STUDIES.map((study) => (
-          <div 
-            key={study.id} 
+          <div
+            key={study.id}
             className="case-study-card"
             style={{ borderLeftColor: getSeverityColor(study.severity) }}
           >
             <div className="case-study-header">
               <h2>{study.title}</h2>
-              <span 
+              <span
                 className="severity-badge"
-                style={{ 
+                style={{
                   backgroundColor: getSeverityColor(study.severity),
                   color: study.severity === 'good' || study.severity === 'moderate' ? '#000' : '#fff'
                 }}
@@ -298,7 +278,7 @@ export const CaseStudies: React.FC = () => {
               </div>
             </div>
 
-            <button 
+            <button
               className="load-case-study-btn"
               onClick={() => loadCaseStudy(study)}
               disabled={loadingStudy === study.id}
@@ -311,8 +291,8 @@ export const CaseStudies: React.FC = () => {
 
       <div className="case-studies-footer">
         <p>
-          💡 <strong>Tip:</strong> After loading a scenario, you can adjust parameters 
-          to see how changes affect pollution dispersion. Try increasing wind speed 
+          💡 <strong>Tip:</strong> After loading a scenario, you can adjust parameters
+          to see how changes affect pollution dispersion. Try increasing wind speed
           or diffusion rate to improve air quality.
         </p>
       </div>

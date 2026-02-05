@@ -7,7 +7,31 @@ export const PollutionInsights: React.FC = () => {
   const { sources, grid, parameters } = useSimulationStore();
   const [aqiHistory, setAqiHistory] = useState<number[]>(new Array(60).fill(0));
   const [showReportModal, setShowReportModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<'health' | 'visual' | 'realworld'>('health');
 
+  const TabButton = ({ active, onClick, icon, label }: any) => (
+    <button
+      onClick={onClick}
+      style={{
+        flex: 1,
+        padding: '6px',
+        background: active ? 'rgba(255,255,255,0.1)' : 'transparent',
+        border: 'none',
+        borderBottom: active ? '2px solid #60a5fa' : '2px solid transparent',
+        color: active ? 'white' : 'rgba(255,255,255,0.5)',
+        cursor: 'pointer',
+        fontSize: '11px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '4px',
+        transition: 'all 0.2s'
+      }}
+    >
+      <span>{icon}</span>
+      <span>{label}</span>
+    </button>
+  );
 
 
   const maxPollution = grid.reduce((max, row) =>
@@ -38,38 +62,45 @@ export const PollutionInsights: React.FC = () => {
 
   const getPollutantDescription = (type: keyof typeof POLLUTANT_TYPES) => {
     return {
-      CHEMICAL: {
-        cleanState: 'Pure Air',
-        pollutedState: 'Toxic Fumes',
-        healthImpact: 'Can cause respiratory issues, nausea, and long-term organ damage',
-        visualCue: 'Dark red clouds indicate high toxicity',
-        realWorld: 'Like industrial emissions or chemical spills'
+      CO2: {
+        cleanState: 'Fresh Air (400ppm)',
+        pollutedState: 'High C02 (>1000ppm)',
+        healthImpact: 'Dizziness, headache, shortness of breath, asphyxiation in confined spaces.',
+        visualCue: 'Invisible gas (displayed as grey mist)',
+        realWorld: 'Poorly ventilated rooms, industrial exhaust.'
       },
-      OIL: {
-        cleanState: 'Clear Water',
-        pollutedState: 'Oil Slick',
-        healthImpact: 'Kills marine life, contaminates water supplies',
-        visualCue: 'Dark patches floating on surface',
-        realWorld: 'Like oil tanker spills or pipeline leaks'
+      PM25: {
+        cleanState: 'Clear Sky',
+        pollutedState: 'Haze / Smog',
+        healthImpact: 'Penetrates deep lungs, heart disease risk, asthma attacks.',
+        visualCue: 'Purple/Hazy clouds reducing visibility',
+        realWorld: 'Wildfire smoke, vehicle exhaust, dust storms.'
       },
-      SEWAGE: {
-        cleanState: 'Fresh Water',
-        pollutedState: 'Contaminated Water',
-        healthImpact: 'Spreads diseases, causes algae blooms',
-        visualCue: 'Brown clouds with organic growth',
-        realWorld: 'Like sewage overflow or agricultural runoff'
+      NO2: {
+        cleanState: 'Clean Air',
+        pollutedState: 'Brown Smog',
+        healthImpact: 'Inflames lining of lungs, reduces immunity to lung infections.',
+        visualCue: 'Reddish-brown layer over cities',
+        realWorld: 'Traffic congestion, power plants.'
       },
-      THERMAL: {
-        cleanState: 'Normal Temperature',
-        pollutedState: 'Heat Pollution',
-        healthImpact: 'Reduces oxygen in water, kills temperature-sensitive species',
-        visualCue: 'Orange glow showing heat spread',
-        realWorld: 'Like power plant cooling water discharge'
+      SO2: {
+        cleanState: 'Clean Air',
+        pollutedState: 'Acidic Gas',
+        healthImpact: 'Throat irritation, bronchoconstriction, aggravates heart disease.',
+        visualCue: 'Colorless but forms yellow haze',
+        realWorld: 'Coal burning, volcanic eruptions.'
+      },
+      RADON: {
+        cleanState: 'Safe Baseline',
+        pollutedState: 'Radioactive Accumulation',
+        healthImpact: '#1 cause of lung cancer among non-smokers. Silent killer.',
+        visualCue: 'Invisible (displayed as red warning zones)',
+        realWorld: 'Seeping from ground into basements.'
       }
     }[type];
   };
 
-  const currentPollutant = sources[0]?.type || 'CHEMICAL';
+  const currentPollutant = sources[0]?.type || 'CO2';
   const description = getPollutantDescription(currentPollutant);
 
   const handleDownloadReport = () => {
@@ -193,7 +224,7 @@ export const PollutionInsights: React.FC = () => {
   return (
     <div className="pollution-insights" data-tour="pollution-insights">
       <div className="insights-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 className="insights-title">Environmental Impact</h3>
+        <h3 className="insights-title">Pollution Insights</h3>
         <button
           className="btn btn-sm btn-secondary"
           onClick={handleDownloadReport}
@@ -205,255 +236,247 @@ export const PollutionInsights: React.FC = () => {
         </button>
       </div>
 
-      {/* Air Quality Index */}
-      <div className="aqi-display">
-        <div className="aqi-label">Air Quality Index</div>
-        <div className="aqi-value" style={{ color: aqiCategory.color }}>
-          <span className="aqi-number">{aqi}</span>
-          <span className="aqi-icon">{aqiCategory.icon}</span>
+      {/* Main AQI Status */}
+      <div className="aqi-display" style={{ padding: '12px', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <div className="aqi-label" style={{ fontSize: '11px', color: '#94a3b8' }}>CURRENT AQI</div>
+          <div className="status-indicator" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: aqiCategory.color, boxShadow: `0 0 8px ${aqiCategory.color}` }}></div>
+            <span style={{ fontSize: '11px', color: aqiCategory.color, fontWeight: 600 }}>Live Monitoring</span>
+          </div>
         </div>
-        <div className="aqi-category" style={{ color: aqiCategory.color }}>
-          {aqiCategory.level}
-        </div>
-        <div className="aqi-bar">
-          <div
-            className="aqi-fill"
-            style={{
-              width: `${Math.min(100, (aqi / 500) * 100)}%`,
-              backgroundColor: aqiCategory.color
-            }}
-          />
+
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
+          <div className="aqi-value" style={{ fontSize: '36px', fontWeight: 800, color: aqiCategory.color, lineHeight: 1 }}>
+            {aqi}
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '16px', fontWeight: 600, color: '#f8fafc' }}>{aqiCategory.level}</div>
+            <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>{aqiCategory.icon} Impact Warning</div>
+          </div>
         </div>
       </div>
 
-      {/* Real-Time Graph */}
-      <div className="aqi-chart-container" style={{ marginBottom: '1rem', background: 'rgba(0,0,0,0.1)', padding: '10px', borderRadius: '8px' }}>
-        <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '5px', display: 'flex', justifyContent: 'space-between' }}>
-          <span>LIVE AQI TREND (60s)</span>
-          <span style={{ color: aqiCategory.color }}>● Live</span>
+      {/* Atmosphere & Compliance Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+        <div style={{ background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div style={{ fontSize: '10px', color: '#94a3b8', marginBottom: '4px' }}>ATMOSPHERE</div>
+          <div style={{ fontSize: '12px', color: '#e2e8f0', fontWeight: 600 }}>
+            {parameters.diffusionRate < 0.1 ? 'Stagnant' : parameters.diffusionRate > 0.3 ? 'Unstable' : 'Neutral'}
+          </div>
+          <div style={{ fontSize: '10px', color: '#64748b' }}>
+            {parameters.diffusionRate < 0.1 ? 'Traps Pollutants' : 'Favors Dispersion'}
+          </div>
         </div>
-        <svg viewBox="0 0 300 60" style={{ width: '100%', height: '60px', overflow: 'visible' }}>
-          {/* Grid lines */}
-          <line x1="0" y1="0" x2="300" y2="0" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-          <line x1="0" y1="30" x2="300" y2="30" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-          <line x1="0" y1="60" x2="300" y2="60" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-
-          {/* Area Path */}
-          <path
-            d={`M 0 60 ${aqiHistory.map((val, i) => `L ${(i / 59) * 300} ${60 - (val / 500) * 60}`).join(' ')} L 300 60 Z`}
-            fill={aqiCategory.color}
-            fillOpacity="0.2"
-          />
-
-          {/* Line Path */}
-          <path
-            d={`M 0 ${60 - (aqiHistory[0] / 500) * 60} ${aqiHistory.map((val, i) => `L ${(i / 59) * 300} ${60 - (val / 500) * 60}`).join(' ')}`}
-            fill="none"
-            stroke={aqiCategory.color}
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+        <div style={{ background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div style={{ fontSize: '10px', color: '#94a3b8', marginBottom: '4px' }}>EPA STATUS</div>
+          <div style={{ fontSize: '12px', color: aqi > 100 ? '#ef4444' : '#10b981', fontWeight: 600 }}>
+            {aqi > 100 ? 'Non-Compliant' : 'Compliant'}
+          </div>
+          <div style={{ fontSize: '10px', color: '#64748b' }}>
+            {aqi > 100 ? 'Exceeds Limits' : 'Within NAAQS'}
+          </div>
+        </div>
       </div>
 
-      {/* Pollution Type Insights */}
-      <div className="pollutant-insights">
-        <h4 className="pollutant-name">{POLLUTANT_TYPES[currentPollutant].name}</h4>
-        <div className="insight-grid">
-          <div className="insight-item">
-            <div className="insight-label">Clean State</div>
-            <div className="insight-value clean">{description.cleanState}</div>
-          </div>
-          <div className="insight-item">
-            <div className="insight-label">Polluted State</div>
-            <div className="insight-value polluted">{description.pollutedState}</div>
-          </div>
+      {/* Tabs: Analysis Details */}
+      <div className="analysis-card" style={{ background: '#0f172a', borderRadius: '12px', border: '1px solid #1e293b', overflow: 'hidden', marginBottom: '12px' }}>
+        <div style={{ borderBottom: '1px solid #1e293b', padding: '8px 12px', background: '#1e293b' }}>
+          <span style={{ fontSize: '12px', fontWeight: 600, color: '#94a3b8' }}>{POLLUTANT_TYPES[currentPollutant].name} Analysis</span>
         </div>
 
-        <div className="insight-description">
-          <div className="description-section">
-            <div className="section-icon">⚕️</div>
-            <div className="section-content">
-              <div className="section-label">Health Impact</div>
-              <div className="section-text">{description.healthImpact}</div>
-            </div>
+        <div className="description-tabs">
+          <div style={{ display: 'flex', background: '#0f172a' }}>
+            <TabButton active={activeTab === 'health'} onClick={() => setActiveTab('health')} icon="⚕️" label="Health" />
+            <TabButton active={activeTab === 'visual'} onClick={() => setActiveTab('visual')} icon="👁️" label="Visuals" />
+            <TabButton active={activeTab === 'realworld'} onClick={() => setActiveTab('realworld')} icon="🌍" label="Context" />
           </div>
 
-          <div className="description-section">
-            <div className="section-icon">👁️</div>
-            <div className="section-content">
-              <div className="section-label">What You See</div>
-              <div className="section-text">{description.visualCue}</div>
-            </div>
-          </div>
-
-          <div className="description-section">
-            <div className="section-icon">🌍</div>
-            <div className="section-content">
-              <div className="section-label">Real-World Example</div>
-              <div className="section-text">{description.realWorld}</div>
-            </div>
+          <div style={{ padding: '12px', fontSize: '13px', lineHeight: '1.5', color: '#cbd5e1', minHeight: '80px', borderTop: '1px solid #1e293b' }}>
+            {activeTab === 'health' && (
+              <>
+                <div style={{ fontWeight: 600, color: '#f87171', marginBottom: '4px' }}>Health Impact:</div>
+                {description.healthImpact}
+              </>
+            )}
+            {activeTab === 'visual' && (
+              <>
+                <div style={{ fontWeight: 600, color: '#60a5fa', marginBottom: '4px' }}>Visual Identification:</div>
+                {description.visualCue}
+              </>
+            )}
+            {activeTab === 'realworld' && (
+              <>
+                <div style={{ fontWeight: 600, color: '#a78bfa', marginBottom: '4px' }}>Real-World Examples:</div>
+                {description.realWorld}
+              </>
+            )}
           </div>
         </div>
+      </div>
+
+      {/* Safety Advisory Summary */}
+      <div style={{
+        padding: '10px',
+        background: `rgba(${parseInt(aqiCategory.color.slice(1, 3), 16)}, ${parseInt(aqiCategory.color.slice(3, 5), 16)}, ${parseInt(aqiCategory.color.slice(5, 7), 16)}, 0.1)`,
+        borderLeft: `3px solid ${aqiCategory.color}`,
+        borderRadius: '4px',
+        marginBottom: '1rem'
+      }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, color: aqiCategory.color, marginBottom: '4px', textTransform: 'uppercase' }}>Safety Advisory</div>
+        <div style={{ fontSize: '12px', color: '#e2e8f0' }}>{getRecommendations(aqi)[0]}</div>
       </div>
 
       {/* Color Legend */}
-      <div className="color-legend">
-        <div className="legend-title">Color Guide</div>
-        <div className="legend-items">
-          <div className="legend-item">
-            <div className="legend-color" style={{ background: 'linear-gradient(to right, #7dd3fc, #3b82f6)' }}></div>
-            <span>Clean (Safe to breathe)</span>
-          </div>
-          <div className="legend-item">
-            <div className="legend-color" style={{ background: 'linear-gradient(to right, #a78bfa, #8b5cf6)' }}></div>
-            <span>Moderate (Slight concern)</span>
-          </div>
-          <div className="legend-item">
-            <div className="legend-color" style={{ background: 'linear-gradient(to right, #fb923c, #f97316)' }}></div>
-            <span>Unhealthy (Avoid exposure)</span>
-          </div>
-          <div className="legend-item">
-            <div className="legend-color" style={{ background: 'linear-gradient(to right, #f87171, #dc2626)' }}></div>
-            <span>Hazardous (Dangerous)</span>
-          </div>
+      <div className="color-legend-compact">
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#64748b', marginBottom: '4px' }}>
+          <span>Safe (0)</span>
+          <span>Moderate (100)</span>
+          <span>Hazardous (300+)</span>
         </div>
+        <div style={{
+          height: '6px',
+          borderRadius: '3px',
+          background: 'linear-gradient(to right, #10b981, #f59e0b, #ef4444, #7f1d1d)',
+          width: '100%'
+        }} />
       </div>
 
       {/* Report Download Modal */}
-      {showReportModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.7)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 10000,
-          backdropFilter: 'blur(4px)'
-        }}>
+      {
+        showReportModal && (
           <div style={{
-            background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-            borderRadius: '16px',
-            padding: '24px',
-            maxWidth: '600px',
-            width: '90%',
-            border: '1px solid rgba(139, 92, 246, 0.3)',
-            boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
-            maxHeight: '80vh',
-            overflow: 'auto'
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            backdropFilter: 'blur(4px)'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <BarChart3 size={24} color="#8b5cf6" />
-                <h3 style={{ margin: 0, color: 'white', fontSize: '18px' }}>Download Environmental Report</h3>
-              </div>
-              <button
-                onClick={() => setShowReportModal(false)}
-                style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '16px', borderRadius: '8px', marginBottom: '16px' }}>
-              <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginBottom: '12px' }}>
-                <strong style={{ color: 'white' }}>Report Contents:</strong>
-              </div>
-              <div style={{ display: 'grid', gap: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.8)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <CheckCircle size={14} color="#10b981" />
-                  <span>Current AQI: {aqi} ({aqiCategory.level})</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <CheckCircle size={14} color="#10b981" />
-                  <span>60-second trend data with {aqiHistory.filter(v => v > 0).length} data points</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <CheckCircle size={14} color="#10b981" />
-                  <span>Environmental parameters (wind, diffusion, release rates)</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <CheckCircle size={14} color="#10b981" />
-                  <span>{sources.length} pollution source{sources.length !== 1 ? 's' : ''} with detailed info</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <CheckCircle size={14} color="#10b981" />
-                  <span>Health impact assessment and recommendations</span>
-                </div>
-              </div>
-            </div>
-
             <div style={{
-              background: 'rgba(59, 130, 246, 0.1)',
-              border: '1px solid rgba(59, 130, 246, 0.3)',
-              padding: '12px',
-              borderRadius: '8px',
-              marginBottom: '16px'
+              background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+              borderRadius: '16px',
+              padding: '24px',
+              maxWidth: '600px',
+              width: '90%',
+              border: '1px solid rgba(139, 92, 246, 0.3)',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+              maxHeight: '80vh',
+              overflow: 'auto'
             }}>
-              <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginBottom: '8px' }}>
-                <strong style={{ color: '#60a5fa' }}>Quick Stats:</strong>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <BarChart3 size={24} color="#8b5cf6" />
+                  <h3 style={{ margin: 0, color: 'white', fontSize: '18px' }}>Download Environmental Report</h3>
+                </div>
+                <button
+                  onClick={() => setShowReportModal(false)}
+                  style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}
+                >
+                  <X size={20} />
+                </button>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '12px' }}>
-                <div>
-                  <div style={{ color: 'rgba(255,255,255,0.6)', marginBottom: '4px' }}>Average AQI</div>
-                  <div style={{ color: 'white', fontSize: '16px', fontWeight: 600 }}>
-                    {Math.floor(aqiHistory.reduce((a, b) => a + b, 0) / aqiHistory.length)}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ color: 'rgba(255,255,255,0.6)', marginBottom: '4px' }}>Peak AQI</div>
-                  <div style={{ color: 'white', fontSize: '16px', fontWeight: 600 }}>
-                    {Math.max(...aqiHistory)}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ color: 'rgba(255,255,255,0.6)', marginBottom: '4px' }}>Pollutant</div>
-                  <div style={{ color: 'white', fontSize: '13px', fontWeight: 600 }}>
-                    {POLLUTANT_TYPES[currentPollutant].name}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ color: 'rgba(255,255,255,0.6)', marginBottom: '4px' }}>Data Period</div>
-                  <div style={{ color: 'white', fontSize: '13px', fontWeight: 600 }}>
-                    60 seconds
-                  </div>
-                </div>
-              </div>
-            </div>
 
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button
-                className="btn btn-secondary"
-                onClick={() => setShowReportModal(false)}
-                style={{ padding: '8px 16px' }}
-              >
-                Cancel
-              </button>
-              <button
-                className="btn btn-secondary"
-                onClick={downloadCSV}
-                style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
-              >
-                <FileSpreadsheet size={14} />
-                Export CSV
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={confirmDownloadReport}
-                style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
-              >
-                <Download size={14} />
-                Download JSON
-              </button>
+              <div style={{ background: 'rgba(0,0,0,0.3)', padding: '16px', borderRadius: '8px', marginBottom: '16px' }}>
+                <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginBottom: '12px' }}>
+                  <strong style={{ color: 'white' }}>Report Contents:</strong>
+                </div>
+                <div style={{ display: 'grid', gap: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.8)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <CheckCircle size={14} color="#10b981" />
+                    <span>Current AQI: {aqi} ({aqiCategory.level})</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <CheckCircle size={14} color="#10b981" />
+                    <span>60-second trend data with {aqiHistory.filter(v => v > 0).length} data points</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <CheckCircle size={14} color="#10b981" />
+                    <span>Environmental parameters (wind, diffusion, release rates)</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <CheckCircle size={14} color="#10b981" />
+                    <span>{sources.length} pollution source{sources.length !== 1 ? 's' : ''} with detailed info</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <CheckCircle size={14} color="#10b981" />
+                    <span>Health impact assessment and recommendations</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{
+                background: 'rgba(59, 130, 246, 0.1)',
+                border: '1px solid rgba(59, 130, 246, 0.3)',
+                padding: '12px',
+                borderRadius: '8px',
+                marginBottom: '16px'
+              }}>
+                <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginBottom: '8px' }}>
+                  <strong style={{ color: '#60a5fa' }}>Quick Stats:</strong>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '12px' }}>
+                  <div>
+                    <div style={{ color: 'rgba(255,255,255,0.6)', marginBottom: '4px' }}>Average AQI</div>
+                    <div style={{ color: 'white', fontSize: '16px', fontWeight: 600 }}>
+                      {Math.floor(aqiHistory.reduce((a, b) => a + b, 0) / aqiHistory.length)}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ color: 'rgba(255,255,255,0.6)', marginBottom: '4px' }}>Peak AQI</div>
+                    <div style={{ color: 'white', fontSize: '16px', fontWeight: 600 }}>
+                      {Math.max(...aqiHistory)}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ color: 'rgba(255,255,255,0.6)', marginBottom: '4px' }}>Pollutant</div>
+                    <div style={{ color: 'white', fontSize: '13px', fontWeight: 600 }}>
+                      {POLLUTANT_TYPES[currentPollutant].name}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ color: 'rgba(255,255,255,0.6)', marginBottom: '4px' }}>Data Period</div>
+                    <div style={{ color: 'white', fontSize: '13px', fontWeight: 600 }}>
+                      60 seconds
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setShowReportModal(false)}
+                  style={{ padding: '8px 16px' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={downloadCSV}
+                  style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <FileSpreadsheet size={14} />
+                  Export CSV
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={confirmDownloadReport}
+                  style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Download size={14} />
+                  Download JSON
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   );
 };

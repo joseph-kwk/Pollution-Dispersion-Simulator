@@ -2,10 +2,10 @@ import React, { useRef, useState, useEffect } from 'react';
 import { useSimulationStore } from '../stores/simulationStore';
 import { useShareableURL } from '../hooks/useShareableURL';
 import { POLLUTANT_TYPES, GRID_SIZE } from '../types';
-import { Play, Pause, RotateCcw, Wind, Waves, Droplets, Plus, Trash2, Download, Upload, FileJson, CheckCircle, AlertCircle, X, Info, Keyboard, Share2 } from 'lucide-react';
+import { Wind, Waves, Droplets, Plus, Trash2, Download, Upload, FileJson, CheckCircle, AlertCircle, X, Info, Keyboard, Share2 } from 'lucide-react';
 
 export const ControlPanel: React.FC = () => {
-  const { isRunning, parameters, sources, gpuEnabled, scientistMode, isDrawingObstacles, actions } = useSimulationStore();
+  const { parameters, sources, gpuEnabled, scientistMode, isDrawingObstacles, actions } = useSimulationStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -520,36 +520,9 @@ export const ControlPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* Simulation Controls */}
+      {/* Simulation Speed Controls - Kept in panel */}
       <div className="control-section">
-        <h3 className="section-title">Simulation</h3>
-
-        <div className="btn-group">
-          <button
-            className={`btn ${isRunning ? 'btn-success' : 'btn-primary'} ripple scale-hover`}
-            onClick={actions.start}
-            disabled={isRunning}
-            style={isRunning ? { opacity: 0.6 } : {}}
-          >
-            <Play style={{ width: '16px', height: '16px' }} />
-            {isRunning ? 'Running...' : 'Start'}
-          </button>
-          <button
-            className="btn btn-secondary ripple scale-hover"
-            onClick={actions.pause}
-            disabled={!isRunning}
-          >
-            <Pause style={{ width: '16px', height: '16px' }} />
-            Pause
-          </button>
-          <button
-            className="btn btn-danger ripple scale-hover"
-            onClick={actions.reset}
-          >
-            <RotateCcw style={{ width: '16px', height: '16px' }} />
-            Reset
-          </button>
-        </div>
+        <h3 className="section-title">Simulation Settings</h3>
 
         {/* Simulation Speed */}
         <div className="control-group">
@@ -589,89 +562,95 @@ export const ControlPanel: React.FC = () => {
             />
           </div>
         </div>
+      </div>
 
-        {/* Pollution Type */}
-        <div className="control-group">
-          <label className="control-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span>Pollution Type</span>
-            <button
-              onClick={() => setActiveTooltip(activeTooltip === 'pollutantType' ? null : 'pollutantType')}
-              style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex' }}
-              title="Learn more"
-            >
-              <Info size={14} color="#8b5cf6" />
-            </button>
-          </label>
-          {activeTooltip === 'pollutantType' && (
-            <div style={{
-              fontSize: '11px',
-              background: 'rgba(139, 92, 246, 0.1)',
-              border: '1px solid rgba(139, 92, 246, 0.3)',
-              borderRadius: '6px',
-              padding: '8px',
-              marginBottom: '8px',
-              color: 'rgba(255,255,255,0.9)',
-              lineHeight: 1.4
-            }}>
-              {tooltips.pollutantType}
-            </div>
-          )}
-          <div className="select-container">
-            <select
-              className="select-input"
-              value={sources[0]?.type || 'CHEMICAL'}
-              onChange={(e) => {
-                // Update first source type
-                const newType = e.target.value as keyof typeof POLLUTANT_TYPES;
-                actions.removeSource(0);
-                actions.addSource({
-                  x: sources[0]?.x || GRID_SIZE / 2,
-                  y: sources[0]?.y || GRID_SIZE / 2,
-                  type: newType
-                });
-              }}
-            >
-              {Object.entries(POLLUTANT_TYPES).map(([key, type]) => (
-                <option key={key} value={key}>{type.name}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Pollution Sources */}
-        <div className="control-group">
-          <label className="control-label">
-            Pollution Sources ({sources.length})
-          </label>
+      {/* Pollution Type */}
+      <div className="control-group">
+        <label className="control-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span>Pollution Type</span>
           <button
-            className="btn btn-secondary ripple scale-hover"
-            onClick={() => actions.addSource({
-              x: Math.floor(GRID_SIZE / 2),
-              y: Math.floor(GRID_SIZE / 2),
-              type: 'CHEMICAL'
-            })}
-            style={{ width: '100%', marginBottom: '8px' }}
+            onClick={() => setActiveTooltip(activeTooltip === 'pollutantType' ? null : 'pollutantType')}
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex' }}
+            title="Learn more"
           >
-            <Plus style={{ width: '14px', height: '14px', marginRight: '4px' }} />
-            Add Source
+            <Info size={14} color="#8b5cf6" />
           </button>
-          {sources.map((source, index) => (
-            <div key={index} className="source-item">
-              <div className="source-info">
-                <span>Source {index + 1}: {POLLUTANT_TYPES[source.type].name}</span>
-                <span>({source.x}, {source.y})</span>
-              </div>
-              <button
-                className="btn btn-danger btn-sm"
-                onClick={() => actions.removeSource(index)}
-                disabled={sources.length === 1}
-              >
-                <Trash2 style={{ width: '12px', height: '12px' }} />
-              </button>
-            </div>
-          ))}
+        </label>
+        {activeTooltip === 'pollutantType' && (
+          <div style={{
+            fontSize: '11px',
+            background: 'rgba(139, 92, 246, 0.1)',
+            border: '1px solid rgba(139, 92, 246, 0.3)',
+            borderRadius: '6px',
+            padding: '8px',
+            marginBottom: '8px',
+            color: 'rgba(255,255,255,0.9)',
+            lineHeight: 1.4
+          }}>
+            {tooltips.pollutantType}
+          </div>
+        )}
+        <div className="select-container">
+          <select
+            className="select-input"
+            value={sources[0]?.type || 'CO2'}
+            onChange={(e) => {
+              // Update first source type
+              const newType = e.target.value as keyof typeof POLLUTANT_TYPES;
+              actions.removeSource(0);
+              actions.addSource({
+                x: sources[0]?.x || GRID_SIZE / 2,
+                y: sources[0]?.y || GRID_SIZE / 2,
+                type: newType
+              });
+            }}
+          >
+            {Object.entries(POLLUTANT_TYPES).map(([key, type]) => (
+              <option key={key} value={key}>{type.name}</option>
+            ))}
+          </select>
         </div>
       </div>
+
+      {/* Pollution Sources */}
+      <div className="control-group">
+        <label className="control-label">
+          Pollution Sources ({sources.length})
+        </label>
+        <button
+          className="btn btn-secondary ripple scale-hover"
+          onClick={() => actions.addSource({
+            x: Math.floor(GRID_SIZE / 2),
+            y: Math.floor(GRID_SIZE / 2),
+            type: 'CO2'
+          })}
+          style={{ width: '100%', marginBottom: '8px' }}
+        >
+          <Plus style={{ width: '14px', height: '14px', marginRight: '4px' }} />
+          Add Source
+        </button>
+        {sources.map((source, index) => (
+          <div key={index} className="source-item" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+            <div className="source-info" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '13px', fontWeight: 500 }}>
+                {index + 1}. {POLLUTANT_TYPES[source.type].name}
+              </span>
+              <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                Position: ({source.x}, {source.y})
+              </span>
+            </div>
+            <button
+              className="btn btn-danger btn-sm"
+              onClick={() => actions.removeSource(index)}
+              disabled={sources.length === 1}
+              style={{ flexShrink: 0, padding: '4px 8px' }}
+            >
+              <Trash2 style={{ width: '14px', height: '14px' }} />
+            </button>
+          </div>
+        ))}
+      </div>
+
 
       {/* Environmental Controls */}
       <div className="control-section">
@@ -849,6 +828,6 @@ export const ControlPanel: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
+    </div >
   );
 };

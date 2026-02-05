@@ -485,7 +485,8 @@ body {
 /* Canvas AQI Indicator */
 .canvas-aqi-indicator {
     position: absolute;
-    top: 1.5rem;
+    top: auto;
+    bottom: 1.5rem;
     right: 1.5rem;
     background: rgba(0, 0, 0, 0.75);
     backdrop-filter: blur(10px);

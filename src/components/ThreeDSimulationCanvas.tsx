@@ -9,7 +9,8 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
 // @ts-ignore
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass';
-import { Camera } from 'lucide-react';
+import { Camera, Play, Pause, RotateCcw } from 'lucide-react';
+import { SimulationCommentary } from './SimulationCommentary';
 
 const PARTICLE_COUNT = 8000;
 const PARTICLE_SIZE = 0.2;
@@ -272,7 +273,7 @@ export const ThreeDSimulationCanvas: React.FC = () => {
       positions[i3 + 2] += (Math.random() - 0.5) * 0.02;
 
       // Determine dominant pollutant type at this location
-      let dominantType = sources.length > 0 ? sources[0].type : 'CHEMICAL';
+      let dominantType = sources.length > 0 ? sources[0].type : 'CO2';
       if (sources.length > 1) {
         // Find closest source
         let minDist = Infinity;
@@ -465,22 +466,25 @@ export const ThreeDSimulationCanvas: React.FC = () => {
         actions.setGrid(fluidDynamicsRef.current.getDensity());
       }
 
-      // Update scene background based on average pollution level
+      // Update scene background based on pollution level
       const grid = fluidDynamicsRef.current.getDensity();
       let totalDensity = 0;
+      let maxDensity = 0;
       let cellCount = 0;
       for (let i = 0; i < GRID_SIZE; i++) {
         for (let j = 0; j < GRID_SIZE; j++) {
-          totalDensity += grid[i][j];
+          const val = grid[i][j];
+          totalDensity += val;
+          if (val > maxDensity) maxDensity = val;
           cellCount++;
         }
       }
-      const avgDensity = totalDensity / cellCount;
-      const normalizedAvg = Math.min(avgDensity / 255, 1.0);
+      // Use max density for background intensity to show "peak" pollution
+      const normalizedAvg = Math.min(maxDensity / 255, 1.0);
 
-      // Calculate AQI for emoji display - more sensitive to pollution changes
-      // Map average density directly to AQI scale (0-500)
-      const aqi = Math.min(500, Math.floor(avgDensity * 2));
+      // Calculate AQI for emoji display - Use MAX density for localized impact
+      // Map max density (0-255) to AQI scale (0-500)
+      const aqi = Math.min(500, Math.floor(maxDensity * 2));
       setCurrentAQI(aqi);
 
       // Interpolate background from clean (dark blue) to polluted (murky brown/red)
@@ -618,6 +622,89 @@ export const ThreeDSimulationCanvas: React.FC = () => {
         <Camera size={16} />
         <span>Capture</span>
       </button>
+
+      {/* Real-time Commentary Overlay */}
+      <div style={{
+        position: 'absolute',
+        top: '1rem',
+        right: '1rem',
+        width: '320px',
+        zIndex: 50,
+        pointerEvents: 'none' // Allow clicking through to canvas
+      }}>
+        <div style={{ pointerEvents: 'auto' }}>
+          <SimulationCommentary />
+        </div>
+      </div>
+
+      {/* Main Playback Controls - Top Center */}
+      <div style={{
+        position: 'absolute',
+        top: '1rem',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        background: 'rgba(15, 23, 42, 0.7)',
+        backdropFilter: 'blur(10px)',
+        border: '1px solid rgba(148, 163, 184, 0.2)',
+        borderRadius: '12px',
+        padding: '6px 12px',
+        display: 'flex',
+        gap: '8px',
+        zIndex: 100,
+        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+      }}>
+        <button
+          onClick={isRunning ? actions.pause : actions.start}
+          title={isRunning ? "Pause Simulation" : "Start Simulation"}
+          style={{
+            background: isRunning ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+            border: `1px solid ${isRunning ? 'rgba(239, 68, 68, 0.4)' : 'rgba(16, 185, 129, 0.4)'}`,
+            color: isRunning ? '#ef4444' : '#10b981',
+            borderRadius: '8px',
+            width: '36px',
+            height: '36px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+        >
+          {isRunning ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
+        </button>
+
+        <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
+
+        <button
+          onClick={actions.reset}
+          title="Reset Simulation"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: '#94a3b8',
+            borderRadius: '8px',
+            width: '36px',
+            height: '36px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = '#e2e8f0';
+            e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = '#94a3b8';
+            e.currentTarget.style.background = 'transparent';
+          }}
+        >
+          <RotateCcw size={18} />
+        </button>
+      </div>
 
       {/* Air Quality Emoji Overlay - Hidden in Scientist Mode */}
       {isRunning && !scientistMode && (

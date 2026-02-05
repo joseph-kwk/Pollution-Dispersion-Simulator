@@ -90,58 +90,69 @@ export interface SimulationStore extends SimulationState {
 // Constants
 export const GRID_SIZE = 80;
 export const POLLUTANT_TYPES = {
-  CHEMICAL: {
-    id: 'chemical',
-    name: 'Chemical Pollution',
-    description: 'Industrial chemical waste, highly toxic and slow to disperse',
-    baseColor: { r: 139, g: 0, b: 0 },
-    diffusionModifier: 0.8,
+  CO2: {
+    id: 'co2',
+    name: 'Carbon Dioxide (CO2)',
+    description: 'Greenhouse gas. Heavier than air, accumulates in low-lying areas. Invisible but dangerous in high concentrations.',
+    baseColor: { r: 100, g: 116, b: 139 }, // Slate grey (invisible in reality, visualized as grey)
+    diffusionModifier: 1.0,
     behavior: {
-      sinkRate: 0.2,
+      sinkRate: 0.15, // Sinks (Heavy gas)
+      reactivity: 0.0,
+      viscosity: 0.9,
+    },
+    effects: ['asphyxiation', 'acidification']
+  },
+  PM25: {
+    id: 'pm25',
+    name: 'PM2.5 (Particulate Matter)',
+    description: 'Fine particles <2.5µm. Penetrates deep into lungs. Found in smoke, haze, and vehicle exhaust.',
+    baseColor: { r: 168, g: 85, b: 247 }, // Purple for high danger/haze
+    diffusionModifier: 0.6, // Suspended longer
+    behavior: {
+      sinkRate: 0.02, // Lofts/Suspends
       reactivity: 0.1,
-      viscosity: 1.2
+      viscosity: 1.1,
     },
-    effects: ['toxicity', 'waterQuality']
+    effects: ['respiratory', 'cardiovascular']
   },
-  OIL: {
-    id: 'oil',
-    name: 'Oil Spill',
-    description: 'Oil-based pollutants, forms a thick layer on water surface',
-    baseColor: { r: 47, g: 79, b: 79 },
-    diffusionModifier: 0.6,
+  NO2: {
+    id: 'no2',
+    name: 'Nitrogen Dioxide (NO2)',
+    description: 'Reddish-brown gas involved in smog formation. Emitted by combustion engines and power plants.',
+    baseColor: { r: 180, g: 83, b: 9 }, // Brown/Amber
+    diffusionModifier: 1.1,
     behavior: {
-      sinkRate: -0.3,
-      reactivity: 0.05,
-      viscosity: 2.0
+      sinkRate: 0.05, // Slightly heavier than air
+      reactivity: 0.8, // Highly reactive (Ozone precursor)
+      viscosity: 1.0,
     },
-    effects: ['surfaceSpread', 'waterQuality']
+    effects: ['lungIrritation', 'smog']
   },
-  SEWAGE: {
-    id: 'sewage',
-    name: 'Organic Waste',
-    description: 'Sewage and organic pollutants, affects water quality and promotes algae growth',
-    baseColor: { r: 101, g: 67, b: 33 },
+  SO2: {
+    id: 'so2',
+    name: 'Sulfur Dioxide (SO2)',
+    description: 'Colorless, pungent gas from burning fossil fuels. Precursor to acid rain and particulate formation.',
+    baseColor: { r: 234, g: 179, b: 8 }, // Yellowish (sulfur association)
     diffusionModifier: 1.2,
     behavior: {
-      sinkRate: 0.1,
-      reactivity: 0.3,
-      viscosity: 1.1,
-      organicGrowth: 0.2
+      sinkRate: 0.08,
+      reactivity: 0.6,
+      viscosity: 1.0,
     },
-    effects: ['organicContent', 'waterQuality', 'algaeGrowth']
+    effects: ['acidRain', 'respiratory']
   },
-  THERMAL: {
-    id: 'thermal',
-    name: 'Thermal Pollution',
-    description: 'Heat discharge raising water temperature, affecting oxygen levels',
-    baseColor: { r: 255, g: 140, b: 0 },
-    diffusionModifier: 1.5,
+  RADON: {
+    id: 'radon',
+    name: 'Radon Gas',
+    description: 'Radioactive, colorless, odorless. Heaviest gas, accumulates significantly in basements/low spots.',
+    baseColor: { r: 255, g: 100, b: 100 }, // Warning Red (Radioactive)
+    diffusionModifier: 0.4, // Slow diffusion
     behavior: {
-      sinkRate: -0.1,
-      reactivity: 0.4,
-      viscosity: 0.8,
-      tempGradient: 0.3
+      sinkRate: 0.4, // Very heavy
+      reactivity: 0.01,
+      viscosity: 1.5,
     },
-    effects: ['temperature', 'oxygenLevel', 'waterQuality']
+    effects: ['cancer', 'radiation']
   }
 } as const;

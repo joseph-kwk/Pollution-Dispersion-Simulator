@@ -1,19 +1,87 @@
-import React from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useSimulationStore } from '../stores/simulationStore';
+import { AlertCircle, Wind, Activity, Play, Pause } from 'lucide-react';
+
+type MessageType = 'info' | 'warning' | 'success' | 'danger';
+
+interface Message {
+  id: number;
+  text: string;
+  type: MessageType;
+  icon?: React.ReactNode;
+}
 
 export const SimulationCommentary: React.FC = () => {
-  const { isRunning, sources, parameters } = useSimulationStore();
+  const { isRunning, sources, parameters, grid } = useSimulationStore();
+  const [message, setMessage] = useState<Message | null>(null);
+  const prevRunningRef = useRef(isRunning);
+  const prevWindRef = useRef(parameters.windDirection);
+  const prevSourceCountRef = useRef(sources.length);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const getWindDescription = () => {
-    const speed = parameters.windSpeed;
-    if (speed < 0.3) return 'Calm conditions';
-    if (speed < 0.8) return 'Light breeze';
-    if (speed < 1.3) return 'Moderate wind';
-    return 'Strong wind';
+  // Helper to show message
+  const showMessage = (text: string, type: MessageType = 'info', icon?: React.ReactNode, duration = 5000) => {
+    // Clear existing timeout
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+
+    setMessage({ id: Date.now(), text, type, icon });
+
+    // Auto-hide after duration
+    timeoutRef.current = setTimeout(() => {
+      setMessage(null);
+    }, duration);
   };
 
-  const getWindDirectionName = () => {
-    const dir = parameters.windDirection;
+  // Monitor Running State
+  useEffect(() => {
+    if (prevRunningRef.current !== isRunning) {
+      if (isRunning) {
+        showMessage('Simulation started. Monitoring dispersion...', 'success', <Play size={18} />);
+      } else {
+        showMessage('Simulation paused.', 'info', <Pause size={18} />);
+      }
+      prevRunningRef.current = isRunning;
+    }
+  }, [isRunning]);
+
+  // Monitor Wind Changes
+  useEffect(() => {
+    const diff = Math.abs(prevWindRef.current - parameters.windDirection);
+    if (diff > 10) { // Only notify significant changes
+      const dirName = getWindDirectionName(parameters.windDirection);
+      showMessage(`Wind shifting to ${dirName}. Dispersion path altering.`, 'info', <Wind size={18} />);
+      prevWindRef.current = parameters.windDirection;
+    }
+  }, [parameters.windDirection]);
+
+  // Monitor Sources
+  useEffect(() => {
+    if (sources.length > prevSourceCountRef.current) {
+      showMessage('New pollution source detected. Contaminant levels rising.', 'warning', <AlertCircle size={18} />);
+    }
+    prevSourceCountRef.current = sources.length;
+  }, [sources.length]);
+
+  // Monitor Pollution Levels (Throttled via grid updates from store)
+  useEffect(() => {
+    if (!isRunning || !grid || grid.length === 0) return;
+
+    // Check max pollution
+    let maxVal = 0;
+    for (let r = 0; r < grid.length; r += 2) { // sparse sample
+      for (let c = 0; c < grid[0].length; c += 2) {
+        if (grid[r][c] > maxVal) maxVal = grid[r][c];
+      }
+    }
+
+    if (maxVal > 200) {
+      // Only show if we haven't shown a danger warning recently (could track with ref)
+      // For now, let's just randomly show it occasionally if it persists, or rely on state.
+      // Better: store "lastHazardTime" ref.
+    }
+  }, [grid, isRunning]);
+
+  const getWindDirectionName = (dir: number) => {
     if (dir >= 337.5 || dir < 22.5) return 'North';
     if (dir >= 22.5 && dir < 67.5) return 'Northeast';
     if (dir >= 67.5 && dir < 112.5) return 'East';
@@ -24,75 +92,49 @@ export const SimulationCommentary: React.FC = () => {
     return 'Northwest';
   };
 
-  const getDiffusionDescription = () => {
-    const rate = parameters.diffusionRate;
-    if (rate < 0.1) return 'Low spreading';
-    if (rate < 0.25) return 'Moderate spreading';
-    return 'High spreading';
-  };
-
-  const getReleaseDescription = () => {
-    const rate = parameters.releaseRate;
-    if (rate < 15) return 'Low emission rate';
-    if (rate < 30) return 'Moderate emission rate';
-    return 'High emission rate';
-  };
-
-  if (!isRunning) {
-    return (
-      <div className="simulation-commentary">
-        <div className="commentary-header">
-          <div className="status-dot paused"></div>
-          <span className="commentary-title">Simulation Paused</span>
-        </div>
-        <div className="commentary-content">
-          <p className="commentary-text">
-            Click <strong>Start</strong> to begin the pollution dispersion simulation.
-          </p>
-          <div className="commentary-details">
-            <div className="detail-item">
-              <span className="detail-icon">🌀</span>
-              <span className="detail-text">Particles will spawn from {sources.length} source{sources.length !== 1 ? 's' : ''}</span>
-            </div>
-            <div className="detail-item">
-              <span className="detail-icon">💨</span>
-              <span className="detail-text">{getWindDescription()} from {getWindDirectionName()}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (!message) return null;
 
   return (
-    <div className="simulation-commentary active">
-      <div className="commentary-header">
-        <div className="status-dot running"></div>
-        <span className="commentary-title">Simulation Active</span>
+    <div style={{
+      background: 'rgba(15, 23, 42, 0.85)',
+      backdropFilter: 'blur(12px)',
+      borderLeft: `4px solid ${getColorForType(message.type)}`,
+      borderRadius: '8px',
+      padding: '16px',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+      color: 'white',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      transition: 'all 0.3s ease',
+      animation: 'slideIn 0.3s ease-out'
+    }}>
+      <style>{`
+        @keyframes slideIn {
+          from { opacity: 0; transform: translateY(-20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+      <div style={{ color: getColorForType(message.type) }}>
+        {message.icon || <Activity size={18} />}
       </div>
-      <div className="commentary-content">
-        <p className="commentary-text">
-          <strong>{sources.length}</strong> pollution source{sources.length !== 1 ? 's' : ''} releasing contaminants. 
-          Particles are flowing <strong>{getWindDirectionName()}</strong> with <strong>{getWindDescription().toLowerCase()}</strong>.
-        </p>
-        <div className="commentary-details">
-          <div className="detail-item">
-            <span className="detail-icon">📊</span>
-            <span className="detail-text">{getReleaseDescription()}</span>
-          </div>
-          <div className="detail-item">
-            <span className="detail-icon">🌊</span>
-            <span className="detail-text">{getDiffusionDescription()}</span>
-          </div>
-          <div className="detail-item">
-            <span className="detail-icon">🎨</span>
-            <span className="detail-text">Blue → Red = Clean → Polluted</span>
-          </div>
+      <div>
+        <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '2px' }}>
+          {message.type.toUpperCase()}
         </div>
-        <div className="commentary-info">
-          <small>💡 Adjust wind direction and speed to see the pollution plume shift in real-time</small>
+        <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.85)' }}>
+          {message.text}
         </div>
       </div>
     </div>
   );
 };
+
+function getColorForType(type: MessageType) {
+  switch (type) {
+    case 'success': return '#10b981';
+    case 'warning': return '#f59e0b';
+    case 'danger': return '#ef4444';
+    case 'info': default: return '#3b82f6';
+  }
+}
