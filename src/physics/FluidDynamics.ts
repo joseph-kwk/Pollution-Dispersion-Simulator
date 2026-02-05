@@ -3,19 +3,20 @@ import { WebGLSimulationEngine } from './WebGLSimulationEngine';
 
 export class FluidDynamics {
   private gridSize: number;
-  private baseDt: number = 0.1; // Base time step
-  private dt: number = 0.1; // Current time step
+  private dt: number = 0.1;
 
-  // Velocity fields
-  private u!: number[][]; // x-velocity
-  private v!: number[][]; // y-velocity
+  // Velocity fields (Current and Previous)
+  private u: number[][]; // x-velocity
+  private v: number[][]; // y-velocity
+  private u_prev: number[][];
+  private v_prev: number[][];
 
-  // Density field (pollution)
-  private density!: number[][];
-  private densityPrev!: number[][];
+  // Density fields (Current and Previous)
+  private density: number[][];
+  private density_prev: number[][];
 
   // Obstacles
-  private obstacles!: boolean[][];
+  private obstacles: boolean[][];
 
   // GPU acceleration
   private gpuEngine: WebGLSimulationEngine | null = null;
@@ -23,20 +24,23 @@ export class FluidDynamics {
 
   constructor(gridSize: number = GRID_SIZE) {
     this.gridSize = gridSize;
-    this.initializeFields();
+
+    // Initialize standard fields
+    this.u = this.createField();
+    this.v = this.createField();
+    this.u_prev = this.createField();
+    this.v_prev = this.createField();
+    this.density = this.createField();
+    this.density_prev = this.createField();
+    this.obstacles = Array(gridSize).fill(0).map(() => Array(gridSize).fill(false));
 
     // Try to initialize GPU acceleration
     if (WebGLSimulationEngine.isSupported()) {
       try {
-        // Create a dedicated canvas for GPU physics if one isn't provided
-        // This avoids context conflicts with Three.js
         const gpuCanvas = document.createElement('canvas');
         gpuCanvas.width = gridSize;
         gpuCanvas.height = gridSize;
-        
         this.gpuEngine = new WebGLSimulationEngine(gpuCanvas, gridSize);
-        // Don't auto-enable GPU, let the store control it via setGPUEnabled
-        // this.useGPU = true; 
         console.log('GPU acceleration initialized successfully');
       } catch (error) {
         console.warn('GPU acceleration failed to initialize:', error);
@@ -45,193 +49,267 @@ export class FluidDynamics {
     }
   }
 
-  private initializeFields(): void {
-    const size = this.gridSize;
-    this.u = Array(size).fill(0).map(() => Array(size).fill(0));
-    this.v = Array(size).fill(0).map(() => Array(size).fill(0));
-    this.density = Array(size).fill(0).map(() => Array(size).fill(0));
-    this.densityPrev = Array(size).fill(0).map(() => Array(size).fill(0));
-    this.obstacles = Array(size).fill(0).map(() => Array(size).fill(false));
+  private createField(): number[][] {
+    return Array(this.gridSize).fill(0).map(() => Array(this.gridSize).fill(0));
   }
 
-  // Toggle GPU acceleration
+  // --- Public Interface ---
+
   setGPUEnabled(enabled: boolean): void {
     this.useGPU = enabled && this.gpuEngine !== null;
   }
 
-  // Set obstacles
   setObstacles(obstacles: boolean[][]): void {
     this.obstacles = obstacles.map(row => [...row]);
   }
 
-  // Set density field (pollution)
   setDensity(density: number[][]): void {
     this.density = density.map(row => [...row]);
   }
 
-  // Get density field
   getDensity(): number[][] {
     return this.density.map(row => [...row]);
   }
 
-  // Get velocity X field
   getVelocityX(): number[][] {
     return this.u.map(row => [...row]);
   }
 
-  // Get velocity Y field
   getVelocityY(): number[][] {
     return this.v.map(row => [...row]);
   }
 
-  // Add source to density
   addDensitySource(x: number, y: number, amount: number): void {
     if (x >= 0 && x < this.gridSize && y >= 0 && y < this.gridSize) {
-      this.density[y][x] += amount;
-      if (this.density[y][x] > 255) this.density[y][x] = 255;
-    }
-  }
-
-  // Set velocity field (wind)
-  setVelocityField(windDirection: number, windSpeed: number): void {
-    const angleRad = (windDirection * Math.PI) / 180;
-    const speed = windSpeed * 2.0; // Scale for visibility
-    const baseVelX = speed * Math.cos(angleRad);
-    const baseVelY = speed * Math.sin(angleRad);
-
-    for (let i = 0; i < this.gridSize; i++) {
-      for (let j = 0; j < this.gridSize; j++) {
-        if (!this.obstacles[i][j]) {
-          this.u[i][j] = baseVelX;
-          this.v[i][j] = baseVelY;
-        } else {
-          this.u[i][j] = 0;
-          this.v[i][j] = 0;
-        }
+      if (!this.obstacles[y][x]) {
+        this.density[y][x] += amount;
+        if (this.density[y][x] > 255) this.density[y][x] = 255;
       }
     }
   }
 
-  // Semi-Lagrangian advection
-  private advect(field: number[][], fieldPrev: number[][], u: number[][], v: number[][]): void {
-    for (let i = 1; i < this.gridSize - 1; i++) {
-      for (let j = 1; j < this.gridSize - 1; j++) {
-        if (this.obstacles[i][j]) {
-          field[i][j] = 0;
-          continue;
-        }
-
-        // Trace back particle
-        const x = j - this.dt * u[i][j];
-        const y = i - this.dt * v[i][j];
-
-        // Bilinear interpolation
-        const x0 = Math.floor(x);
-        const x1 = x0 + 1;
-        const y0 = Math.floor(y);
-        const y1 = y0 + 1;
-
-        const s1 = x - x0;
-        const s0 = 1 - s1;
-        const t1 = y - y0;
-        const t0 = 1 - t1;
-
-        let val = 0;
-        if (x0 >= 0 && x0 < this.gridSize && y0 >= 0 && y0 < this.gridSize) val += s0 * t0 * fieldPrev[y0][x0];
-        if (x1 >= 0 && x1 < this.gridSize && y0 >= 0 && y0 < this.gridSize) val += s1 * t0 * fieldPrev[y0][x1];
-        if (x0 >= 0 && x0 < this.gridSize && y1 >= 0 && y1 < this.gridSize) val += s0 * t1 * fieldPrev[y1][x0];
-        if (x1 >= 0 && x1 < this.gridSize && y1 >= 0 && y1 < this.gridSize) val += s1 * t1 * fieldPrev[y1][x1];
-
-        field[i][j] = val;
+  addVelocityForce(x: number, y: number, amountX: number, amountY: number): void {
+    if (x >= 0 && x < this.gridSize && y >= 0 && y < this.gridSize) {
+      if (!this.obstacles[y][x]) {
+        this.u[y][x] += amountX;
+        this.v[y][x] += amountY;
       }
     }
   }
 
-  // Diffusion using Gauss-Seidel relaxation
-  private diffuse(field: number[][], fieldPrev: number[][], diff: number): void {
-    const a = this.dt * diff * this.gridSize * this.gridSize;
-
-    for (let k = 0; k < 20; k++) { // Jacobi iterations
-      for (let i = 1; i < this.gridSize - 1; i++) {
-        for (let j = 1; j < this.gridSize - 1; j++) {
-          if (!this.obstacles[i][j]) {
-            field[i][j] = (fieldPrev[i][j] +
-                          a * (field[i-1][j] + field[i+1][j] +
-                               field[i][j-1] + field[i][j+1])) / (1 + 4 * a);
-          } else {
-            field[i][j] = 0;
-          }
-        }
-      }
-    }
+  reset(): void {
+    this.u = this.createField();
+    this.v = this.createField();
+    this.u_prev = this.createField();
+    this.v_prev = this.createField();
+    this.density = this.createField();
+    this.density_prev = this.createField();
   }
 
-  // Set boundary conditions
-  private setBoundaryConditions(field: number[][], type: 'velocity' | 'density'): void {
-    for (let i = 0; i < this.gridSize; i++) {
-      field[i][0] = type === 'velocity' ? -field[i][1] : field[i][1];
-      field[i][this.gridSize - 1] = type === 'velocity' ? -field[i][this.gridSize - 2] : field[i][this.gridSize - 2];
-      field[0][i] = type === 'velocity' ? -field[1][i] : field[1][i];
-      field[this.gridSize - 1][i] = type === 'velocity' ? -field[this.gridSize - 2][i] : field[this.gridSize - 2][i];
-    }
-    
-    // Corners
-    field[0][0] = 0.5 * (field[1][0] + field[0][1]);
-    field[0][this.gridSize-1] = 0.5 * (field[1][this.gridSize-1] + field[0][this.gridSize-2]);
-    field[this.gridSize-1][0] = 0.5 * (field[this.gridSize-2][0] + field[this.gridSize-1][1]);
-    field[this.gridSize-1][this.gridSize-1] = 0.5 * (field[this.gridSize-2][this.gridSize-1] + field[this.gridSize-1][this.gridSize-2]);
-  }
-
-  // Main simulation step
   step(parameters: SimulationParameters, sources: PollutionSource[] = []): void {
-    // Update time step based on simulation speed
-    this.dt = this.baseDt * (parameters.simulationSpeed || 1.0);
+    this.dt = 0.1 * (parameters.simulationSpeed || 1.0);
+
+    // 1. Solve Velocity (Always on CPU for consistency)
+    this.solveVelocity(parameters);
 
     if (this.useGPU && this.gpuEngine) {
-      // Use GPU acceleration
+      // Pass the computed velocity field to the GPU
+      this.gpuEngine.updateVelocity(this.u, this.v);
+      // Run density advection/diffusion on GPU
       this.gpuEngine.simulateFrame(this.density, parameters, sources, this.obstacles, { readback: true });
     } else {
-      // Use CPU simulation
-      this.cpuStep(parameters, sources);
+      this.solveDensity(parameters, sources);
     }
   }
 
-  // CPU-based simulation (original implementation)
-  private cpuStep(parameters: SimulationParameters, sources: PollutionSource[]): void {
-    // 1. Add pollution at sources
-    sources.forEach((source: PollutionSource) => {
-      if (source.active && source.x >= 0 && source.y >= 0 &&
-          source.x < this.gridSize && source.y < this.gridSize) {
+  // --- CPU Physics Implementation (Navier-Stokes) ---
+
+  private solveVelocity(parameters: SimulationParameters): void {
+    const N = this.gridSize;
+    const visc = parameters.viscosity * 0.0001;
+    const windSpeed = parameters.windSpeed;
+    const windDir = parameters.windDirection;
+
+    // Add Wind as force
+    const angleRad = (windDir * Math.PI) / 180;
+    const forceX = Math.cos(angleRad) * windSpeed * 0.5;
+    const forceY = Math.sin(angleRad) * windSpeed * 0.5;
+
+    for (let i = 0; i < N; i++) {
+      for (let j = 0; j < N; j++) {
+        if (!this.obstacles[i][j]) {
+          this.u_prev[i][j] = forceX;
+          this.v_prev[i][j] = forceY;
+        }
+      }
+    }
+    this.add_source(this.u, this.u_prev, this.dt);
+    this.add_source(this.v, this.v_prev, this.dt);
+
+    if (visc > 0) {
+      this.diffuse(1, this.u_prev, this.u, visc);
+      this.diffuse(2, this.v_prev, this.v, visc);
+      this.project(this.u_prev, this.v_prev, this.u, this.v);
+      this.advect(1, this.u, this.u_prev, this.u_prev, this.v_prev);
+      this.advect(2, this.v, this.v_prev, this.u_prev, this.v_prev);
+      this.project(this.u, this.v, this.u_prev, this.v_prev);
+    } else {
+      // Inviscid solver (faster, good for smoke)
+      this.project(this.u_prev, this.v_prev, this.u, this.v);
+      this.advect(1, this.u, this.u_prev, this.u_prev, this.v_prev);
+      this.advect(2, this.v, this.v_prev, this.u_prev, this.v_prev);
+      this.project(this.u, this.v, this.u_prev, this.v_prev);
+    }
+  }
+
+  private solveDensity(parameters: SimulationParameters, sources: PollutionSource[]): void {
+    const N = this.gridSize;
+    const diff = parameters.diffusionRate * 0.0001;
+
+    // Add Sources
+    sources.forEach(source => {
+      if (source.active) {
         this.addDensitySource(source.x, source.y, parameters.releaseRate);
       }
     });
 
-    // 2. Set velocity field based on wind parameters
-    this.setVelocityField(parameters.windDirection, parameters.windSpeed);
+    // Diffuse Density
+    [this.density, this.density_prev] = [this.density_prev, this.density];
+    this.diffuse(0, this.density, this.density_prev, diff);
 
-    // 3. Diffuse Density
-    // Swap buffers so densityPrev has current state (with sources), density is target
-    [this.density, this.densityPrev] = [this.densityPrev, this.density];
-    this.diffuse(this.density, this.densityPrev, parameters.diffusionRate);
-    this.setBoundaryConditions(this.density, 'density');
+    // Advect Density
+    [this.density, this.density_prev] = [this.density_prev, this.density];
+    this.advect(0, this.density, this.density_prev, this.u, this.v);
 
-    // 4. Advect Density
-    // Swap buffers so densityPrev has diffused state, density is target
-    [this.density, this.densityPrev] = [this.densityPrev, this.density];
-    this.advect(this.density, this.densityPrev, this.u, this.v);
-    this.setBoundaryConditions(this.density, 'density');
-
-    // 5. Apply decay
-    for (let i = 0; i < this.gridSize; i++) {
-      for (let j = 0; j < this.gridSize; j++) {
+    // Apply Decay
+    for (let i = 0; i < N; i++) {
+      for (let j = 0; j < N; j++) {
         this.density[i][j] *= parameters.decayFactor;
-        this.density[i][j] = Math.max(0, Math.min(255, this.density[i][j]));
+        if (this.density[i][j] < 0) this.density[i][j] = 0;
+        if (this.density[i][j] > 255) this.density[i][j] = 255;
       }
     }
   }
 
-  // Reset simulation
-  reset(): void {
-    this.initializeFields();
+  // Operation 0: Density, 1: X-Velocity, 2: Y-Velocity
+  private add_source(x: number[][], s: number[][], dt: number) {
+    const N = this.gridSize;
+    for (let i = 0; i < N; i++) {
+      for (let j = 0; j < N; j++) {
+        x[i][j] += dt * s[i][j];
+      }
+    }
+  }
+
+  private diffuse(b: number, x: number[][], x0: number[][], diff: number) {
+    const N = this.gridSize;
+    const a = this.dt * diff * (N - 2) * (N - 2);
+    this.lin_solve(b, x, x0, a, 1 + 4 * a);
+  }
+
+  private lin_solve(b: number, x: number[][], x0: number[][], a: number, c: number) {
+    const N = this.gridSize;
+    // Jacobi Iteration
+    // Higher iterations = more accurate but slower. 10-20 is usually good for games.
+    for (let k = 0; k < 15; k++) {
+      for (let i = 1; i < N - 1; i++) {
+        for (let j = 1; j < N - 1; j++) {
+          if (!this.obstacles[i][j]) {
+            x[i][j] = (x0[i][j] + a * (x[i - 1][j] + x[i + 1][j] + x[i][j - 1] + x[i][j + 1])) / c;
+          } else {
+            x[i][j] = 0;
+          }
+        }
+      }
+      this.set_bnd(b, x);
+    }
+  }
+
+  private project(velocX: number[][], velocY: number[][], p: number[][], div: number[][]) {
+    const N = this.gridSize;
+
+    // Calculate Divergence
+    for (let i = 1; i < N - 1; i++) {
+      for (let j = 1; j < N - 1; j++) {
+        // If obstacle, divergence is handled by boundary conditions
+        if (!this.obstacles[i][j]) {
+          div[i][j] = -0.5 * (velocX[i + 1][j] - velocX[i - 1][j] + velocY[i][j + 1] - velocY[i][j - 1]) / N;
+          p[i][j] = 0;
+        }
+      }
+    }
+
+    this.set_bnd(0, div);
+    this.set_bnd(0, p);
+
+    // Solve Poisson equation for pressure
+    this.lin_solve(0, p, div, 1, 4);
+
+    // Subtract gradient field
+    for (let i = 1; i < N - 1; i++) {
+      for (let j = 1; j < N - 1; j++) {
+        if (!this.obstacles[i][j]) {
+          velocX[i][j] -= 0.5 * (N) * (p[i + 1][j] - p[i - 1][j]);
+          velocY[i][j] -= 0.5 * (N) * (p[i][j + 1] - p[i][j - 1]);
+        }
+      }
+    }
+
+    this.set_bnd(1, velocX);
+    this.set_bnd(2, velocY);
+  }
+
+  private advect(b: number, d: number[][], d0: number[][], velocX: number[][], velocY: number[][]) {
+    const N = this.gridSize;
+    const dt0 = this.dt * (N - 2);
+
+    for (let i = 1; i < N - 1; i++) {
+      for (let j = 1; j < N - 1; j++) {
+        if (this.obstacles[i][j]) continue;
+
+        let x = j - dt0 * velocX[i][j];
+        let y = i - dt0 * velocY[i][j];
+
+        // Clamp
+        if (x < 0.5) x = 0.5;
+        if (x > N - 1.5) x = N - 1.5;
+        if (y < 0.5) y = 0.5;
+        if (y > N - 1.5) y = N - 1.5;
+
+        const i0 = Math.floor(x);
+        const i1 = i0 + 1;
+        const j0 = Math.floor(y);
+        const j1 = j0 + 1;
+
+        const s1 = x - i0;
+        const s0 = 1.0 - s1;
+        const t1 = y - j0;
+        const t0 = 1.0 - t1;
+
+        d[i][j] = s0 * (t0 * d0[j0][i0] + t1 * d0[j1][i0]) +
+          s1 * (t0 * d0[j0][i1] + t1 * d0[j1][i1]);
+      }
+    }
+    this.set_bnd(b, d);
+  }
+
+  private set_bnd(b: number, x: number[][]) {
+    const N = this.gridSize;
+
+    // Simple box boundaries
+    for (let i = 1; i < N - 1; i++) {
+      x[i][0] = b === 1 ? -x[i][1] : x[i][1];
+      x[i][N - 1] = b === 1 ? -x[i][N - 2] : x[i][N - 2];
+    }
+    for (let i = 1; i < N - 1; i++) {
+      x[0][i] = b === 2 ? -x[1][i] : x[1][i];
+      x[N - 1][i] = b === 2 ? -x[N - 2][i] : x[N - 2][i];
+    }
+
+    // Corners
+    x[0][0] = 0.5 * (x[1][0] + x[0][1]);
+    x[0][N - 1] = 0.5 * (x[1][N - 1] + x[0][N - 2]);
+    x[N - 1][0] = 0.5 * (x[N - 2][0] + x[N - 1][1]);
+    x[N - 1][N - 1] = 0.5 * (x[N - 2][N - 1] + x[N - 1][N - 2]);
   }
 }

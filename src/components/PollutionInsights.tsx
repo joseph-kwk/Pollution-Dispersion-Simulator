@@ -8,12 +8,9 @@ export const PollutionInsights: React.FC = () => {
   const [aqiHistory, setAqiHistory] = useState<number[]>(new Array(60).fill(0));
   const [showReportModal, setShowReportModal] = useState(false);
 
-  // Calculate total pollution and max pollution for AQI
-  const totalPollution = grid.reduce((sum, row) => 
-    sum + row.reduce((rowSum, cell) => rowSum + cell, 0), 0
-  );
-  
-  const maxPollution = grid.reduce((max, row) => 
+
+
+  const maxPollution = grid.reduce((max, row) =>
     Math.max(max, ...row), 0
   );
 
@@ -130,7 +127,7 @@ export const PollutionInsights: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `pollution-report-${new Date().toISOString().slice(0,10)}.json`;
+    a.download = `pollution-report-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -146,7 +143,7 @@ export const PollutionInsights: React.FC = () => {
     // Build CSV content
     let csv = 'Environmental Impact Report - CSV Export\n';
     csv += `Generated,${new Date().toLocaleString()}\n\n`;
-    
+
     csv += 'SUMMARY STATISTICS\n';
     csv += 'Metric,Value\n';
     csv += `Current AQI,${aqi}\n`;
@@ -156,7 +153,7 @@ export const PollutionInsights: React.FC = () => {
     csv += `Category,${aqiCategory.level}\n`;
     csv += `Pollutant Type,${POLLUTANT_TYPES[currentPollutant].name}\n`;
     csv += `Number of Sources,${sources.length}\n\n`;
-    
+
     csv += 'ENVIRONMENTAL PARAMETERS\n';
     csv += 'Parameter,Value\n';
     csv += `Wind Direction,${parameters.windDirection}°\n`;
@@ -165,7 +162,7 @@ export const PollutionInsights: React.FC = () => {
     csv += `Release Rate,${parameters.releaseRate}\n`;
     csv += `Viscosity,${parameters.viscosity}\n`;
     csv += `Decay Factor,${parameters.decayFactor}\n\n`;
-    
+
     csv += 'AQI TREND DATA (60 seconds)\n';
     csv += 'Second,AQI Value\n';
     aqiHistory.forEach((value, idx) => {
@@ -176,7 +173,7 @@ export const PollutionInsights: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `pollution-data-${new Date().toISOString().slice(0,10)}.csv`;
+    a.download = `pollution-data-${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -197,7 +194,7 @@ export const PollutionInsights: React.FC = () => {
     <div className="pollution-insights" data-tour="pollution-insights">
       <div className="insights-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h3 className="insights-title">Environmental Impact</h3>
-        <button 
+        <button
           className="btn btn-sm btn-secondary"
           onClick={handleDownloadReport}
           title="Download Report"
@@ -219,11 +216,11 @@ export const PollutionInsights: React.FC = () => {
           {aqiCategory.level}
         </div>
         <div className="aqi-bar">
-          <div 
-            className="aqi-fill" 
-            style={{ 
+          <div
+            className="aqi-fill"
+            style={{
               width: `${Math.min(100, (aqi / 500) * 100)}%`,
-              backgroundColor: aqiCategory.color 
+              backgroundColor: aqiCategory.color
             }}
           />
         </div>
@@ -240,14 +237,14 @@ export const PollutionInsights: React.FC = () => {
           <line x1="0" y1="0" x2="300" y2="0" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
           <line x1="0" y1="30" x2="300" y2="30" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
           <line x1="0" y1="60" x2="300" y2="60" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-          
+
           {/* Area Path */}
           <path
             d={`M 0 60 ${aqiHistory.map((val, i) => `L ${(i / 59) * 300} ${60 - (val / 500) * 60}`).join(' ')} L 300 60 Z`}
             fill={aqiCategory.color}
             fillOpacity="0.2"
           />
-          
+
           {/* Line Path */}
           <path
             d={`M 0 ${60 - (aqiHistory[0] / 500) * 60} ${aqiHistory.map((val, i) => `L ${(i / 59) * 300} ${60 - (val / 500) * 60}`).join(' ')}`}
@@ -355,14 +352,14 @@ export const PollutionInsights: React.FC = () => {
                 <BarChart3 size={24} color="#8b5cf6" />
                 <h3 style={{ margin: 0, color: 'white', fontSize: '18px' }}>Download Environmental Report</h3>
               </div>
-              <button 
+              <button
                 onClick={() => setShowReportModal(false)}
                 style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}
               >
                 <X size={20} />
               </button>
             </div>
-            
+
             <div style={{ background: 'rgba(0,0,0,0.3)', padding: '16px', borderRadius: '8px', marginBottom: '16px' }}>
               <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginBottom: '12px' }}>
                 <strong style={{ color: 'white' }}>Report Contents:</strong>
@@ -391,8 +388,8 @@ export const PollutionInsights: React.FC = () => {
               </div>
             </div>
 
-            <div style={{ 
-              background: 'rgba(59, 130, 246, 0.1)', 
+            <div style={{
+              background: 'rgba(59, 130, 246, 0.1)',
               border: '1px solid rgba(59, 130, 246, 0.3)',
               padding: '12px',
               borderRadius: '8px',
@@ -430,14 +427,14 @@ export const PollutionInsights: React.FC = () => {
             </div>
 
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button 
+              <button
                 className="btn btn-secondary"
                 onClick={() => setShowReportModal(false)}
                 style={{ padding: '8px 16px' }}
               >
                 Cancel
               </button>
-              <button 
+              <button
                 className="btn btn-secondary"
                 onClick={downloadCSV}
                 style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
@@ -445,7 +442,7 @@ export const PollutionInsights: React.FC = () => {
                 <FileSpreadsheet size={14} />
                 Export CSV
               </button>
-              <button 
+              <button
                 className="btn btn-primary"
                 onClick={confirmDownloadReport}
                 style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}

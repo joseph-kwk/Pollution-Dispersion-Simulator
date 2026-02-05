@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { useSimulationStore } from '../stores/simulationStore';
 import { useShareableURL } from '../hooks/useShareableURL';
 import { POLLUTANT_TYPES, GRID_SIZE } from '../types';
-import { Play, Pause, RotateCcw, Wind, Waves, Droplets, Plus, Trash2, Download, Upload, FileJson, Square, CheckCircle, AlertCircle, X, Info, Keyboard, Share2 } from 'lucide-react';
+import { Play, Pause, RotateCcw, Wind, Waves, Droplets, Plus, Trash2, Download, Upload, FileJson, CheckCircle, AlertCircle, X, Info, Keyboard, Share2 } from 'lucide-react';
 
 export const ControlPanel: React.FC = () => {
   const { isRunning, parameters, sources, gpuEnabled, scientistMode, isDrawingObstacles, actions } = useSimulationStore();
@@ -70,7 +70,7 @@ export const ControlPanel: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `pollution-sim-${new Date().toISOString().slice(0,10)}.json`;
+    a.download = `pollution-sim-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -103,7 +103,7 @@ export const ControlPanel: React.FC = () => {
 
   const confirmImport = () => {
     if (!importedConfig) return;
-    
+
     actions.reset();
     setTimeout(() => {
       actions.updateParameters(importedConfig.parameters);
@@ -128,7 +128,7 @@ export const ControlPanel: React.FC = () => {
       <div className="control-section">
         <h3 className="section-title">Session</h3>
         <div className="btn-group">
-          <button 
+          <button
             className="btn btn-secondary ripple scale-hover"
             onClick={handleExport}
             title="Save current configuration (S)"
@@ -136,7 +136,7 @@ export const ControlPanel: React.FC = () => {
             <Download style={{ width: '16px', height: '16px' }} />
             Save
           </button>
-          <button 
+          <button
             className="btn btn-secondary ripple scale-hover"
             onClick={() => fileInputRef.current?.click()}
             title="Load configuration"
@@ -144,7 +144,7 @@ export const ControlPanel: React.FC = () => {
             <Upload style={{ width: '16px', height: '16px' }} />
             Load
           </button>
-          <button 
+          <button
             className="btn btn-secondary ripple scale-hover"
             onClick={handleShare}
             title="Share simulation URL"
@@ -171,7 +171,7 @@ export const ControlPanel: React.FC = () => {
             )}
           </button>
         </div>
-        <button 
+        <button
           className="btn btn-secondary ripple scale-hover"
           onClick={() => setShowShortcutsHelp(true)}
           title="View keyboard shortcuts (?)"
@@ -180,14 +180,14 @@ export const ControlPanel: React.FC = () => {
           <Keyboard style={{ width: '16px', height: '16px' }} />
           Shortcuts
         </button>
-          <input 
-            type="file" 
-            ref={fileInputRef}
-            style={{ display: 'none' }}
-            accept=".json"
-            onChange={handleImport}
-          />
-        </div>
+        <input
+          type="file"
+          ref={fileInputRef}
+          style={{ display: 'none' }}
+          accept=".json"
+          onChange={handleImport}
+        />
+      </div>
 
       {/* Export Modal */}
       {showExportModal && (
@@ -245,14 +245,14 @@ export const ControlPanel: React.FC = () => {
               </div>
             </div>
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button 
+              <button
                 className="btn btn-secondary"
                 onClick={() => setShowExportModal(false)}
                 style={{ padding: '8px 16px' }}
               >
                 Cancel
               </button>
-              <button 
+              <button
                 className="btn btn-primary"
                 onClick={confirmExport}
                 style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
@@ -322,8 +322,8 @@ export const ControlPanel: React.FC = () => {
                 </div>
               </div>
             </div>
-            <div style={{ 
-              background: 'rgba(251, 191, 36, 0.1)', 
+            <div style={{
+              background: 'rgba(251, 191, 36, 0.1)',
               border: '1px solid rgba(251, 191, 36, 0.3)',
               padding: '12px',
               borderRadius: '8px',
@@ -338,14 +338,14 @@ export const ControlPanel: React.FC = () => {
               </div>
             </div>
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button 
+              <button
                 className="btn btn-secondary"
                 onClick={() => { setShowImportModal(false); setImportedConfig(null); }}
                 style={{ padding: '8px 16px' }}
               >
                 Cancel
               </button>
-              <button 
+              <button
                 className="btn btn-primary"
                 onClick={confirmImport}
                 style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
@@ -387,7 +387,7 @@ export const ControlPanel: React.FC = () => {
                 <Keyboard size={24} color="#8b5cf6" />
                 <h3 style={{ margin: 0, color: 'white', fontSize: '18px' }}>Keyboard Shortcuts</h3>
               </div>
-              <button 
+              <button
                 onClick={() => setShowShortcutsHelp(false)}
                 style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}
               >
@@ -452,7 +452,7 @@ export const ControlPanel: React.FC = () => {
               }}>?</kbd> anytime to see this help.
             </div>
 
-            <button 
+            <button
               className="btn btn-primary"
               onClick={() => setShowShortcutsHelp(false)}
               style={{ width: '100%', marginTop: '16px', padding: '10px' }}
@@ -466,7 +466,7 @@ export const ControlPanel: React.FC = () => {
       {/* Performance Section */}
       <div className="control-section" data-tour="settings-section">
         <h3 className="section-title">Settings</h3>
-        
+
         {/* GPU Toggle */}
         <div className="toggle-container" style={{ marginBottom: '12px' }}>
           <div>

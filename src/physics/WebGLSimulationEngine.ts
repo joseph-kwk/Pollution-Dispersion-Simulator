@@ -285,9 +285,9 @@ export class WebGLSimulationEngine {
 
     const positions = new Float32Array([
       -1, -1,
-       1, -1,
-      -1,  1,
-       1,  1
+      1, -1,
+      -1, 1,
+      1, 1
     ]);
 
     this.quadBuffer = this.gl.createBuffer();
@@ -312,13 +312,7 @@ export class WebGLSimulationEngine {
       // Upload obstacle mask
       this.uploadObstacleMask(obstacles);
 
-      // Set up velocity field from wind parameters
-      const windAngleRad = (parameters.windDirection * Math.PI) / 180;
-      const windVelocity = [
-        parameters.windSpeed * Math.cos(windAngleRad),
-        parameters.windSpeed * Math.sin(windAngleRad)
-      ];
-      this.setupVelocityField(windVelocity);
+      // Note: Velocity is now updated via updateVelocity() call from FluidDynamics.ts
 
       // Run simulation steps
       this.runAdvection(parameters);
@@ -346,6 +340,30 @@ export class WebGLSimulationEngine {
       console.error('WebGL simulation frame failed:', error);
       throw error;
     }
+  }
+
+  // New method to update velocity from CPU solver
+  updateVelocity(u: number[][], v: number[][]): void {
+    if (!this.gl) return;
+
+    const data = new Float32Array(this.gridSize * this.gridSize * 4);
+
+    for (let y = 0; y < this.gridSize; y++) {
+      for (let x = 0; x < this.gridSize; x++) {
+        const index = (y * this.gridSize + x) * 4;
+        data[index] = u[y][x];
+        data[index + 1] = v[y][x];
+        data[index + 2] = 0;
+        data[index + 3] = 0;
+      }
+    }
+
+    this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.velocity);
+    this.gl.texSubImage2D(
+      this.gl.TEXTURE_2D, 0, 0, 0,
+      this.gridSize, this.gridSize,
+      this.gl.RGBA, this.gl.FLOAT, data
+    );
   }
 
   private runDisplay(): void {
@@ -454,27 +472,6 @@ export class WebGLSimulationEngine {
     }
   }
 
-  private setupVelocityField(windVelocity: number[]): void {
-    if (!this.gl) return;
-
-    const data = new Float32Array(this.gridSize * this.gridSize * 4);
-
-    for (let i = 0; i < this.gridSize * this.gridSize; i++) {
-      const index = i * 4;
-      data[index] = windVelocity[0];
-      data[index + 1] = windVelocity[1];
-      data[index + 2] = 0;
-      data[index + 3] = 0;
-    }
-
-    this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.velocity);
-    this.gl.texSubImage2D(
-      this.gl.TEXTURE_2D, 0, 0, 0,
-      this.gridSize, this.gridSize,
-      this.gl.RGBA, this.gl.FLOAT, data
-    );
-  }
-
   private runAdvection(_parameters: SimulationParameters): void {
     if (!this.gl) return;
 
@@ -488,7 +485,7 @@ export class WebGLSimulationEngine {
 
     if (deltaTimeLoc) this.gl.uniform1f(deltaTimeLoc, 0.016); // ~60fps
     if (gridSizeLoc) this.gl.uniform2f(gridSizeLoc, this.gridSize, this.gridSize);
-    if (texelSizeLoc) this.gl.uniform2f(texelSizeLoc, 1.0/this.gridSize, 1.0/this.gridSize);
+    if (texelSizeLoc) this.gl.uniform2f(texelSizeLoc, 1.0 / this.gridSize, 1.0 / this.gridSize);
 
     // Bind textures
     this.gl.activeTexture(this.gl.TEXTURE0);
@@ -525,7 +522,7 @@ export class WebGLSimulationEngine {
 
     if (diffusionRateLoc) this.gl.uniform1f(diffusionRateLoc, parameters.diffusionRate);
     if (deltaTimeLoc) this.gl.uniform1f(deltaTimeLoc, 0.016);
-    if (texelSizeLoc) this.gl.uniform2f(texelSizeLoc, 1.0/this.gridSize, 1.0/this.gridSize);
+    if (texelSizeLoc) this.gl.uniform2f(texelSizeLoc, 1.0 / this.gridSize, 1.0 / this.gridSize);
 
     this.gl.activeTexture(this.gl.TEXTURE0);
     this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.pollutant);

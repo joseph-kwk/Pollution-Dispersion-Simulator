@@ -3,10 +3,16 @@ import { useSimulationStore } from '../stores/simulationStore';
 import { GRID_SIZE, POLLUTANT_TYPES } from '../types';
 import { FluidDynamics } from '../physics/FluidDynamics';
 import * as THREE from 'three';
+// @ts-ignore
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
+// @ts-ignore
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
+// @ts-ignore
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass';
 import { Camera } from 'lucide-react';
 
-const PARTICLE_COUNT = 5000;
-const PARTICLE_SIZE = 0.15;
+const PARTICLE_COUNT = 8000;
+const PARTICLE_SIZE = 0.2;
 
 const getAQIEmoji = (aqi: number) => {
   if (aqi <= 50) return { emoji: '😊', label: 'Good', color: '#10b981' };
@@ -22,6 +28,7 @@ export const ThreeDSimulationCanvas: React.FC = () => {
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const composerRef = useRef<EffectComposer | null>(null);
   const particlesRef = useRef<THREE.Points | null>(null);
   const gridHelperRef = useRef<THREE.GridHelper | null>(null);
   const vectorGroupRef = useRef<THREE.Group | null>(null);
@@ -31,6 +38,9 @@ export const ThreeDSimulationCanvas: React.FC = () => {
   const raycasterRef = useRef<THREE.Raycaster>(new THREE.Raycaster());
   const mouseRef = useRef<THREE.Vector2>(new THREE.Vector2());
   const planeRef = useRef<THREE.Mesh | null>(null);
+
+  // Throttle store updates
+  const frameCounterRef = useRef<number>(0);
 
   const { sources, parameters, isRunning, gpuEnabled, scientistMode, isDrawingObstacles, obstacles, dynamicWeather, actions } = useSimulationStore();
   const [currentAQI, setCurrentAQI] = useState(0);
@@ -60,7 +70,7 @@ export const ThreeDSimulationCanvas: React.FC = () => {
     // Scene
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0a0a1a);
-    scene.fog = new THREE.Fog(0x0a0a1a, 10, 50);
+    scene.fog = new THREE.Fog(0x0a0a1a, 10, 60);
     sceneRef.current = scene;
 
     // Camera
@@ -70,7 +80,7 @@ export const ThreeDSimulationCanvas: React.FC = () => {
       0.1,
       1000
     );
-    camera.position.set(0, 15, 25);
+    camera.position.set(0, 20, 30);
     camera.lookAt(0, 0, 0);
     cameraRef.current = camera;
 
@@ -78,8 +88,27 @@ export const ThreeDSimulationCanvas: React.FC = () => {
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.toneMapping = THREE.ReinhardToneMapping;
     containerRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
+
+    // Post-processing (Bloom)
+    const renderScene = new RenderPass(scene, camera);
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(containerRef.current.clientWidth, containerRef.current.clientHeight),
+      1.5,  // strength
+      0.4,  // radius
+      0.85  // threshold
+    );
+    // Adjust bloom parameters for aesthetics
+    bloomPass.strength = 1.2;
+    bloomPass.radius = 0.5;
+    bloomPass.threshold = 0.2;
+
+    const composer = new EffectComposer(renderer);
+    composer.addPass(renderScene);
+    composer.addPass(bloomPass);
+    composerRef.current = composer;
 
     // Grid helper
     const gridHelper = new THREE.GridHelper(GRID_SIZE, GRID_SIZE, 0x444444, 0x222222);
@@ -111,7 +140,7 @@ export const ThreeDSimulationCanvas: React.FC = () => {
     scene.add(ambientLight);
 
     // Directional light
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
     directionalLight.position.set(10, 20, 10);
     scene.add(directionalLight);
 
@@ -130,9 +159,9 @@ export const ThreeDSimulationCanvas: React.FC = () => {
       positions[i3 + 2] = (Math.random() - 0.5) * GRID_SIZE;
 
       // Initial colors (light blue)
-      colors[i3] = 0.7;
-      colors[i3 + 1] = 0.8;
-      colors[i3 + 2] = 1.0;
+      colors[i3] = 0.1;
+      colors[i3 + 1] = 0.3;
+      colors[i3 + 2] = 0.5;
 
       // Random velocities
       velocities[i3] = (Math.random() - 0.5) * 0.1;
@@ -151,7 +180,7 @@ export const ThreeDSimulationCanvas: React.FC = () => {
       size: PARTICLE_SIZE,
       vertexColors: true,
       transparent: true,
-      opacity: 0.9,
+      opacity: 0.8,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       sizeAttenuation: true,
@@ -166,7 +195,7 @@ export const ThreeDSimulationCanvas: React.FC = () => {
     fluidDynamicsRef.current.setGPUEnabled(gpuEnabled);
 
     console.log('Three.js scene initialized with', PARTICLE_COUNT, 'particles');
-  }, [gpuEnabled]);
+  }, [gpuEnabled, scientistMode]);
 
   const updateParticles = useCallback((currentWindDir: number, currentWindSpeed: number) => {
     if (!particlesRef.current || !fluidDynamicsRef.current) return;
@@ -196,14 +225,20 @@ export const ThreeDSimulationCanvas: React.FC = () => {
         if (sources.length > 0) {
           const source = sources[Math.floor(Math.random() * sources.length)];
           positions[i3] = source.x - halfGrid + (Math.random() - 0.5) * 2;
-          positions[i3 + 1] = Math.random() * 3;
+          positions[i3 + 1] = Math.random() * 3 + 1; // Start slightly higher
           positions[i3 + 2] = source.y - halfGrid + (Math.random() - 0.5) * 2;
           lifetimes[i] = 0;
 
           // Reset velocity
-          velocities[i3] = windVelX;
-          velocities[i3 + 1] = 0.05 + Math.random() * 0.05;
-          velocities[i3 + 2] = windVelZ;
+          velocities[i3] = windVelX + (Math.random() - 0.5) * 0.05;
+          velocities[i3 + 1] = 0.1 + Math.random() * 0.1; // Upward burst
+          velocities[i3 + 2] = windVelZ + (Math.random() - 0.5) * 0.05;
+        } else {
+          // Random respawn if no sources
+          positions[i3] = (Math.random() - 0.5) * GRID_SIZE;
+          positions[i3 + 1] = Math.random() * 5;
+          positions[i3 + 2] = (Math.random() - 0.5) * GRID_SIZE;
+          lifetimes[i] = 0;
         }
       }
 
@@ -224,8 +259,8 @@ export const ThreeDSimulationCanvas: React.FC = () => {
 
       // Apply fluid velocity forces (Advection)
       // We blend the particle's current velocity with the fluid velocity
-      velocities[i3] += (fluidU * 0.1 - velocities[i3] * 0.02);
-      velocities[i3 + 2] += (fluidV * 0.1 - velocities[i3 + 2] * 0.02);
+      velocities[i3] += (fluidU * 0.15 - velocities[i3] * 0.03);
+      velocities[i3 + 2] += (fluidV * 0.15 - velocities[i3 + 2] * 0.03);
 
       // Update position
       positions[i3] += velocities[i3];
@@ -256,7 +291,7 @@ export const ThreeDSimulationCanvas: React.FC = () => {
       const pollutantDef = POLLUTANT_TYPES[dominantType];
       // sinkRate > 0 means it sinks (gravity), < 0 means it rises (buoyancy)
       velocities[i3 + 1] -= pollutantDef.behavior.sinkRate * 0.005;
-      
+
       // Floor collision
       if (positions[i3 + 1] < 0) {
         positions[i3 + 1] = 0;
@@ -264,22 +299,27 @@ export const ThreeDSimulationCanvas: React.FC = () => {
       }
 
       // Color based on density and pollutant type
-      const normalizedDensity = Math.min(density / 255, 1.0);
-      
-      // Get base color from pollutant type
-      let baseR = 0.5, baseG = 0.7, baseB = 1.0; // Default: clean air (light blue)
-      
-      if (normalizedDensity > 0.05) { // Only colorize if there's significant pollution
+      const normalizedDensity = Math.min(density / 200, 1.0); // Slightly more sensitive
+
+      // Base ambient color (very dark blue/gray for air)
+      const ambientR = 0.05, ambientG = 0.05, ambientB = 0.1;
+
+      if (normalizedDensity > 0.02) { // Only colorize if there's significant pollution
         const color = pollutantDef.baseColor;
-        baseR = color.r / 255;
-        baseG = color.g / 255;
-        baseB = color.b / 255;
+        // Boost color for bloom effect
+        const boost = 1.5;
+        const r = (color.r / 255) * boost;
+        const g = (color.g / 255) * boost;
+        const b = (color.b / 255) * boost;
+
+        colors[i3] = r * normalizedDensity + ambientR * (1 - normalizedDensity);
+        colors[i3 + 1] = g * normalizedDensity + ambientG * (1 - normalizedDensity);
+        colors[i3 + 2] = b * normalizedDensity + ambientB * (1 - normalizedDensity);
+      } else {
+        colors[i3] = ambientR;
+        colors[i3 + 1] = ambientG;
+        colors[i3 + 2] = ambientB;
       }
-      
-      // Interpolate from clean air (light blue) to pollutant color based on density
-      colors[i3] = baseR * normalizedDensity + 0.5 * (1 - normalizedDensity); // Red
-      colors[i3 + 1] = baseG * normalizedDensity + 0.7 * (1 - normalizedDensity); // Green
-      colors[i3 + 2] = baseB * normalizedDensity + 1.0 * (1 - normalizedDensity); // Blue
 
       // Wrap around boundaries
       if (positions[i3] < -halfGrid) positions[i3] = halfGrid;
@@ -300,7 +340,7 @@ export const ThreeDSimulationCanvas: React.FC = () => {
     }
     if (vectorGroupRef.current) {
       vectorGroupRef.current.visible = scientistMode;
-      
+
       // Update vectors if visible
       if (scientistMode) {
         // Clear existing
@@ -394,7 +434,7 @@ export const ThreeDSimulationCanvas: React.FC = () => {
   }, [obstacles]);
 
   const animate = useCallback(() => {
-    if (!sceneRef.current || !cameraRef.current || !rendererRef.current) return;
+    if (!sceneRef.current || !cameraRef.current || (!rendererRef.current && !composerRef.current)) return;
 
     if (isRunning && fluidDynamicsRef.current) {
       // Calculate dynamic wind
@@ -415,9 +455,15 @@ export const ThreeDSimulationCanvas: React.FC = () => {
 
       // Run fluid dynamics simulation
       fluidDynamicsRef.current.step(currentParams, sources);
-      
+
       // Update particles based on simulation
       updateParticles(windDir, windSpeed);
+
+      // Sync Grid to Store every 30 frames (approx 0.5s)
+      frameCounterRef.current++;
+      if (frameCounterRef.current % 30 === 0) {
+        actions.setGrid(fluidDynamicsRef.current.getDensity());
+      }
 
       // Update scene background based on average pollution level
       const grid = fluidDynamicsRef.current.getDensity();
@@ -431,37 +477,43 @@ export const ThreeDSimulationCanvas: React.FC = () => {
       }
       const avgDensity = totalDensity / cellCount;
       const normalizedAvg = Math.min(avgDensity / 255, 1.0);
-      
+
       // Calculate AQI for emoji display - more sensitive to pollution changes
       // Map average density directly to AQI scale (0-500)
       const aqi = Math.min(500, Math.floor(avgDensity * 2));
       setCurrentAQI(aqi);
-      
+
       // Interpolate background from clean (dark blue) to polluted (murky brown/red)
-      const cleanR = 0x0a / 255, cleanG = 0x0a / 255, cleanB = 0x1a / 255;
-      const pollutedR = 0x3a / 255, pollutedG = 0x1a / 255, pollutedB = 0x1a / 255;
-      
+      // Darker background for bloom contrast
+      const cleanR = 0x05 / 255, cleanG = 0x05 / 255, cleanB = 0x10 / 255;
+      const pollutedR = 0x2a / 255, pollutedG = 0x10 / 255, pollutedB = 0x10 / 255;
+
       const bgR = cleanR * (1 - normalizedAvg) + pollutedR * normalizedAvg;
       const bgG = cleanG * (1 - normalizedAvg) + pollutedG * normalizedAvg;
       const bgB = cleanB * (1 - normalizedAvg) + pollutedB * normalizedAvg;
-      
+
       sceneRef.current.background = new THREE.Color(bgR, bgG, bgB);
       sceneRef.current.fog = new THREE.Fog(
         new THREE.Color(bgR, bgG, bgB).getHex(),
         10,
-        50
+        60
       );
 
       // Rotate camera slightly for better view
       const time = Date.now() * 0.0001;
-      cameraRef.current.position.x = Math.sin(time) * 30;
-      cameraRef.current.position.z = Math.cos(time) * 30;
+      cameraRef.current.position.x = Math.sin(time) * 35;
+      cameraRef.current.position.z = Math.cos(time) * 35;
       cameraRef.current.lookAt(0, 0, 0);
     }
 
-    rendererRef.current.render(sceneRef.current, cameraRef.current);
+    if (composerRef.current) {
+      composerRef.current.render();
+    } else {
+      rendererRef.current!.render(sceneRef.current, cameraRef.current);
+    }
+
     animationFrameRef.current = requestAnimationFrame(animate);
-  }, [isRunning, sources, parameters, updateParticles, dynamicWeather]);
+  }, [isRunning, sources, parameters, updateParticles, dynamicWeather, actions]);
 
   const handleResize = useCallback(() => {
     if (!containerRef.current || !cameraRef.current || !rendererRef.current) return;
@@ -472,6 +524,9 @@ export const ThreeDSimulationCanvas: React.FC = () => {
     cameraRef.current.aspect = width / height;
     cameraRef.current.updateProjectionMatrix();
     rendererRef.current.setSize(width, height);
+    if (composerRef.current) {
+      composerRef.current.setSize(width, height);
+    }
   }, []);
 
   useEffect(() => {
@@ -487,6 +542,8 @@ export const ThreeDSimulationCanvas: React.FC = () => {
         containerRef.current.removeChild(rendererRef.current.domElement);
         rendererRef.current.dispose();
       }
+      // Clean up composer passes if needed
+      composerRef.current = null;
     };
   }, [initThreeJS, handleResize]);
 
@@ -509,8 +566,9 @@ export const ThreeDSimulationCanvas: React.FC = () => {
     if (!isRunning && fluidDynamicsRef.current) {
       fluidDynamicsRef.current.reset();
       setCurrentAQI(0);
+      actions.setGrid(fluidDynamicsRef.current.getDensity()); // Sync reset grid
     }
-  }, [isRunning]);
+  }, [isRunning, actions]);
 
   const aqiInfo = getAQIEmoji(currentAQI);
 
@@ -564,13 +622,14 @@ export const ThreeDSimulationCanvas: React.FC = () => {
       {/* Air Quality Emoji Overlay - Hidden in Scientist Mode */}
       {isRunning && !scientistMode && (
         <div className="canvas-aqi-indicator">
-          <div className="canvas-aqi-emoji" style={{ 
+          <div className="canvas-aqi-emoji" style={{
             fontSize: '3rem',
-            filter: `drop-shadow(0 0 10px ${aqiInfo.color})`
+            filter: `drop-shadow(0 0 10px ${aqiInfo.color})`,
+            textShadow: `0 0 20px ${aqiInfo.color}`
           }}>
             {aqiInfo.emoji}
           </div>
-          <div className="canvas-aqi-label" style={{ color: aqiInfo.color }}>
+          <div className="canvas-aqi-label" style={{ color: aqiInfo.color, fontWeight: 'bold' }}>
             {aqiInfo.label}
           </div>
           <div className="canvas-aqi-value" style={{ color: aqiInfo.color }}>

@@ -65,18 +65,24 @@ export interface ControlGroup {
 }
 
 // Store types
-export interface SimulationStore {
-  state: SimulationState;
+// Store types
+export interface SimulationStore extends SimulationState {
   actions: {
     start: () => void;
     pause: () => void;
     reset: () => void;
     updateParameters: (params: Partial<SimulationParameters>) => void;
     addSource: (source: Omit<PollutionSource, 'active'>) => void;
+    setSources: (sources: PollutionSource[]) => void;
     removeSource: (index: number) => void;
     toggleGPU: () => void;
+    toggleScientistMode: () => void;
+    toggleDrawingObstacles: () => void;
+    toggleDynamicWeather: () => void;
     setGrid: (grid: number[][]) => void;
     setObstacles: (obstacles: boolean[][]) => void;
+    addObstacle: (x: number, y: number) => void;
+    removeObstacle: (x: number, y: number) => void;
     setFPS: (fps: number) => void;
   };
 }
