@@ -38,8 +38,11 @@ export const PollutionInsights: React.FC = () => {
     Math.max(max, ...row), 0
   );
 
-  // Calculate air quality index (0-500) based on peak pollution
-  // Multiplier of 5 ensures that release rates of ~50 result in "Very Unhealthy" to "Hazardous" levels
+  const isWater = parameters.medium === 'water';
+  const scoreLabel = isWater ? 'WQI' : 'AQI';
+  const qualityLabel = isWater ? 'Water Quality' : 'Air Quality';
+
+  // Calculate local index (0-500) based on peak density
   const aqi = Math.min(500, Math.floor(maxPollution * 5));
 
   useEffect(() => {
@@ -96,6 +99,20 @@ export const PollutionInsights: React.FC = () => {
         healthImpact: '#1 cause of lung cancer among non-smokers. Silent killer.',
         visualCue: 'Invisible (displayed as red warning zones)',
         realWorld: 'Seeping from ground into basements.'
+      },
+      CRUDE_OIL: {
+        cleanState: 'Pristine Water',
+        pollutedState: 'Oil Slick',
+        healthImpact: 'Coats marine life, toxic to ingest, disrupts oxygen exchange.',
+        visualCue: 'Dark, viscous slick floating on surface',
+        realWorld: 'Tanker spills, offshore drilling leaks.'
+      },
+      DYE: {
+        cleanState: 'Clear Water',
+        pollutedState: 'Chemical Contamination',
+        healthImpact: 'Toxic to aquatic microorganisms, indicator of chemical discharge.',
+        visualCue: 'Bright neon green/blue plume',
+        realWorld: 'Industrial runoff, illegal dumping.'
       }
     }[type];
   };
@@ -187,15 +204,15 @@ export const PollutionInsights: React.FC = () => {
 
     csv += 'ENVIRONMENTAL PARAMETERS\n';
     csv += 'Parameter,Value\n';
-    csv += `Wind Direction,${parameters.windDirection}°\n`;
-    csv += `Wind Speed,${parameters.windSpeed}\n`;
+    csv += `${parameters.medium === 'water' ? 'Current' : 'Wind'} Direction,${parameters.windDirection}°\n`;
+    csv += `${parameters.medium === 'water' ? 'Current' : 'Wind'} Speed,${parameters.windSpeed}\n`;
     csv += `Diffusion Rate,${parameters.diffusionRate}\n`;
     csv += `Release Rate,${parameters.releaseRate}\n`;
     csv += `Viscosity,${parameters.viscosity}\n`;
     csv += `Decay Factor,${parameters.decayFactor}\n\n`;
 
-    csv += 'AQI TREND DATA (60 seconds)\n';
-    csv += 'Second,AQI Value\n';
+    csv += `${scoreLabel} TREND DATA (60 seconds)\n`;
+    csv += `Second,${scoreLabel} Value\n`;
     aqiHistory.forEach((value, idx) => {
       csv += `${idx + 1},${value}\n`;
     });
@@ -213,6 +230,13 @@ export const PollutionInsights: React.FC = () => {
   };
 
   const getRecommendations = (aqiValue: number): string[] => {
+    if (isWater) {
+      if (aqiValue <= 50) return ['Water quality is pristine', 'Safe for aquatic ecosystems', 'No restoration needed'];
+      if (aqiValue <= 100) return ['Acceptable conditions', 'Sensitive organisms may show stress', 'Monitor for localized slicks'];
+      if (aqiValue <= 150) return ['Significant contamination', 'Toxic to spawning grounds', 'Containment booms recommended'];
+      if (aqiValue <= 200) return ['Severe ecosystem damage', 'High aquatic mortality rates', 'Immediate cleanup required'];
+      return ['Aquatic dead zone', 'Catastrophic habitat loss', 'Total ecological collapse'];
+    }
     if (aqiValue <= 50) return ['Air quality is satisfactory', 'Outdoor activities are safe', 'No precautions needed'];
     if (aqiValue <= 100) return ['Acceptable air quality', 'Unusually sensitive people should limit prolonged outdoor exertion', 'General public can enjoy normal activities'];
     if (aqiValue <= 150) return ['Sensitive groups should reduce prolonged outdoor exertion', 'General public should limit outdoor activities', 'Use air purifiers indoors'];
@@ -239,7 +263,7 @@ export const PollutionInsights: React.FC = () => {
       {/* Main AQI Status */}
       <div className="aqi-display" style={{ padding: '12px', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', marginBottom: '12px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-          <div className="aqi-label" style={{ fontSize: '11px', color: '#94a3b8' }}>CURRENT AQI</div>
+          <div className="aqi-label" style={{ fontSize: '11px', color: '#94a3b8' }}>CURRENT {scoreLabel}</div>
           <div className="status-indicator" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: aqiCategory.color, boxShadow: `0 0 8px ${aqiCategory.color}` }}></div>
             <span style={{ fontSize: '11px', color: aqiCategory.color, fontWeight: 600 }}>Live Monitoring</span>
@@ -260,7 +284,7 @@ export const PollutionInsights: React.FC = () => {
       {/* Atmosphere & Compliance Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
         <div style={{ background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-          <div style={{ fontSize: '10px', color: '#94a3b8', marginBottom: '4px' }}>ATMOSPHERE</div>
+          <div style={{ fontSize: '10px', color: '#94a3b8', marginBottom: '4px' }}>{parameters.medium?.toUpperCase()}</div>
           <div style={{ fontSize: '12px', color: '#e2e8f0', fontWeight: 600 }}>
             {parameters.diffusionRate < 0.1 ? 'Stagnant' : parameters.diffusionRate > 0.3 ? 'Unstable' : 'Neutral'}
           </div>
@@ -323,7 +347,7 @@ export const PollutionInsights: React.FC = () => {
         borderRadius: '4px',
         marginBottom: '1rem'
       }}>
-        <div style={{ fontSize: '11px', fontWeight: 700, color: aqiCategory.color, marginBottom: '4px', textTransform: 'uppercase' }}>Safety Advisory</div>
+        <div style={{ fontSize: '11px', fontWeight: 700, color: aqiCategory.color, marginBottom: '4px', textTransform: 'uppercase' }}>{qualityLabel} Advisory</div>
         <div style={{ fontSize: '12px', color: '#e2e8f0' }}>{getRecommendations(aqi)[0]}</div>
       </div>
 
@@ -383,13 +407,16 @@ export const PollutionInsights: React.FC = () => {
               </div>
 
               <div style={{ background: 'rgba(0,0,0,0.3)', padding: '16px', borderRadius: '8px', marginBottom: '16px' }}>
+                <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Live {scoreLabel}
+                </span>
                 <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginBottom: '12px' }}>
                   <strong style={{ color: 'white' }}>Report Contents:</strong>
                 </div>
                 <div style={{ display: 'grid', gap: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.8)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <CheckCircle size={14} color="#10b981" />
-                    <span>Current AQI: {aqi} ({aqiCategory.level})</span>
+                    <span>Current {scoreLabel}: {aqi} ({aqiCategory.level})</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <CheckCircle size={14} color="#10b981" />

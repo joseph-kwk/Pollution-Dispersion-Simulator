@@ -1,26 +1,5 @@
 import { create } from 'zustand';
-import { SimulationState, SimulationParameters, PollutionSource, GRID_SIZE } from '../types';
-
-interface SimulationStore extends SimulationState {
-  actions: {
-    start: () => void;
-    pause: () => void;
-    reset: () => void;
-    updateParameters: (params: Partial<SimulationParameters>) => void;
-    addSource: (source: Omit<PollutionSource, 'active'>) => void;
-    setSources: (sources: PollutionSource[]) => void;
-    removeSource: (index: number) => void;
-    toggleGPU: () => void;
-    toggleScientistMode: () => void;
-    toggleDrawingObstacles: () => void;
-    toggleDynamicWeather: () => void;
-    setGrid: (grid: number[][]) => void;
-    setObstacles: (obstacles: boolean[][]) => void;
-    addObstacle: (x: number, y: number) => void;
-    removeObstacle: (x: number, y: number) => void;
-    setFPS: (fps: number) => void;
-  };
-}
+import { SimulationState, SimulationParameters, PollutionSource, GRID_SIZE, SimulationStore } from '../types';
 
 const initialParameters: SimulationParameters = {
   windDirection: 90,
@@ -29,7 +8,8 @@ const initialParameters: SimulationParameters = {
   releaseRate: 20,
   viscosity: 1.0,
   decayFactor: 0.992,
-  simulationSpeed: 1.0
+  simulationSpeed: 1.0,
+  medium: 'air'
 };
 
 const createInitialGrid = (): number[][] =>
@@ -105,6 +85,9 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
       }
       return { obstacles: newObstacles };
     }),
-    setFPS: (fps) => set({ fps })
+    setFPS: (fps) => set({ fps }),
+    setMedium: (medium) => set((state) => ({
+      parameters: { ...state.parameters, medium }
+    }))
   }
 }));

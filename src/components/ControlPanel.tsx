@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { useSimulationStore } from '../stores/simulationStore';
 import { useShareableURL } from '../hooks/useShareableURL';
 import { POLLUTANT_TYPES, GRID_SIZE } from '../types';
-import { Wind, Waves, Droplets, Plus, Trash2, Download, Upload, FileJson, CheckCircle, AlertCircle, X, Info, Keyboard, Share2, Zap, Microscope, PenTool, CloudLightning, MapPin, Activity } from 'lucide-react';
+import { Wind, Waves, Droplets, Plus, Trash2, Download, Upload, FileJson, CheckCircle, AlertCircle, X, Info, Keyboard, Share2, Zap, Microscope, PenTool, CloudLightning, MapPin, Activity, Save } from 'lucide-react';
 
 export const ControlPanel: React.FC = () => {
   const { parameters, sources, gpuEnabled, scientistMode, isDrawingObstacles, actions } = useSimulationStore();
@@ -61,6 +61,20 @@ export const ControlPanel: React.FC = () => {
       setTimeout(() => setShowShareTooltip(false), 2000);
     });
   };
+
+  // Auto-switch pollutant when medium changes
+  useEffect(() => {
+    if (sources.length === 0) return;
+    const activePollutant = sources[0].type;
+    const typeDef = POLLUTANT_TYPES[activePollutant as keyof typeof POLLUTANT_TYPES];
+
+    if (typeDef && !(typeDef.compatibleMedia as any)?.includes(parameters.medium || 'air')) {
+      const defaultType = parameters.medium === 'water' ? 'CRUDE_OIL' : 'CO2';
+      const newSources = [...sources];
+      newSources[0] = { ...newSources[0], type: defaultType as any };
+      actions.setSources(newSources);
+    }
+  }, [parameters.medium]);
 
   const handleExport = () => {
     setShowExportModal(true);
@@ -137,10 +151,45 @@ export const ControlPanel: React.FC = () => {
     }, 100);
   };
 
+  // Environment Medium Options
+  const mediumOptions = [
+    { value: 'air', label: 'Air (Atmosphere)' },
+    { value: 'water', label: 'Water (Aquatic)' }
+  ];
+
   return (
     <div className="sidebar-content" data-tour="controls-panel">
       <div className="sidebar-header">
         <h2 className="sidebar-title">Controls</h2>
+        <div className="header-actions">
+          <button className="icon-btn" onClick={handleShare} title="Share Simulation">
+            <Share2 size={18} />
+            {showShareTooltip && <span className="tooltip">Link Copied!</span>}
+          </button>
+          <button className="icon-btn" onClick={() => setShowExportModal(true)} title="Save Configuration">
+            <Save size={18} />
+          </button>
+          <button className="icon-btn" onClick={() => setShowShortcutsHelp(true)} title="Keyboard Shortcuts">
+            <Keyboard size={18} />
+          </button>
+        </div>
+      </div>
+
+      {/* Environment Medium Selector */}
+      <div className="control-section">
+        <label className="control-label">Environment Medium</label>
+        <div className="medium-selector" style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+          {mediumOptions.map((option) => (
+            <button
+              key={option.value}
+              className={`btn ${parameters.medium === option.value ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ flex: 1, padding: '0.5rem', fontSize: '0.9rem' }}
+              onClick={() => actions.setMedium(option.value as any)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Session Management */}
@@ -634,17 +683,27 @@ export const ControlPanel: React.FC = () => {
             onChange={(e) => {
               // Update first source type
               const newType = e.target.value as keyof typeof POLLUTANT_TYPES;
-              actions.removeSource(0);
-              actions.addSource({
-                x: sources[0]?.x || GRID_SIZE / 2,
-                y: sources[0]?.y || GRID_SIZE / 2,
-                type: newType
-              });
+              // Instead of removing/adding, we should ideally update. But simulate store has no updateSource?
+              // Actions: addSource, setSources, removeSource.
+              // To update source 0:
+              if (sources.length > 0) {
+                const newSources = [...sources];
+                newSources[0] = { ...newSources[0], type: newType };
+                actions.setSources(newSources);
+              } else {
+                actions.addSource({
+                  x: GRID_SIZE / 2,
+                  y: GRID_SIZE / 2,
+                  type: newType
+                });
+              }
             }}
           >
-            {Object.entries(POLLUTANT_TYPES).map(([key, type]) => (
-              <option key={key} value={key}>{type.name}</option>
-            ))}
+            {Object.entries(POLLUTANT_TYPES)
+              .filter(([_, type]) => (type.compatibleMedia as any)?.includes(parameters.medium || 'air'))
+              .map(([key, type]) => (
+                <option key={key} value={key}>{type.name}</option>
+              ))}
           </select>
         </div>
       </div>
@@ -784,20 +843,22 @@ export const ControlPanel: React.FC = () => {
 
         {/* Wind Direction */}
         <div className="control-group">
-          <label className="control-label" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-              <Wind style={{ width: '14px', height: '14px', marginRight: '4px' }} />
-              Wind Direction
-            </div>
+          <div className="control-header">
+            <label className="control-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {parameters.medium === 'water' ? <Waves size={16} color="#60a5fa" /> : <Wind size={16} color="#60a5fa" />}
+              <span>{parameters.medium === 'water' ? 'Current' : 'Wind'} Direction</span>
+            </label>
             <button
               onClick={() => setActiveTooltip(activeTooltip === 'windDirection' ? null : 'windDirection')}
-              style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex' }}
+              className="btn btn-icon-sm"
               title="Learn more"
             >
-              <Info size={14} color="#8b5cf6" />
+              <Info size={12} />
             </button>
-            <span className="control-value">{parameters.windDirection}°</span>
-          </label>
+          </div>
+          <div className="control-value-label">
+            {parameters.windDirection}°
+          </div>
           {activeTooltip === 'windDirection' && (
             <div style={{
               fontSize: '11px',
@@ -827,20 +888,22 @@ export const ControlPanel: React.FC = () => {
 
         {/* Wind Speed */}
         <div className="control-group">
-          <label className="control-label" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-              <Wind style={{ width: '14px', height: '14px', marginRight: '4px' }} />
-              Wind Speed
-            </div>
+          <div className="control-header">
+            <label className="control-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {parameters.medium === 'water' ? <Activity size={16} color="#60a5fa" /> : <Wind size={16} color="#60a5fa" />}
+              <span>{parameters.medium === 'water' ? 'Current' : 'Wind'} Speed</span>
+            </label>
             <button
               onClick={() => setActiveTooltip(activeTooltip === 'windSpeed' ? null : 'windSpeed')}
-              style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex' }}
+              className="btn btn-icon-sm"
               title="Learn more"
             >
-              <Info size={14} color="#8b5cf6" />
+              <Info size={12} />
             </button>
-            <span className="control-value">{parameters.windSpeed}</span>
-          </label>
+          </div>
+          <div className="control-value-label">
+            {parameters.windSpeed.toFixed(2)}
+          </div>
           {activeTooltip === 'windSpeed' && (
             <div style={{
               fontSize: '11px',

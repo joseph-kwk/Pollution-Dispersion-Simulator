@@ -232,6 +232,22 @@ export const ThreeDSimulationCanvas: React.FC = () => {
     console.log('Three.js scene initialized with', PARTICLE_COUNT, 'smoke particles');
   }, [gpuEnabled]);
 
+  // Handle Medium changes (Background, Fog, and Grid Visibility)
+  useEffect(() => {
+    if (!sceneRef.current) return;
+    const scene = sceneRef.current;
+
+    if (parameters.medium === 'water') {
+      // Deep aquatic blue
+      scene.background = new THREE.Color(0x001a2e);
+      scene.fog = new THREE.Fog(0x001a2e, 10, 80);
+    } else {
+      // Midnight air
+      scene.background = new THREE.Color(0x0a0a1a);
+      scene.fog = new THREE.Fog(0x0a0a1a, 10, 60);
+    }
+  }, [parameters.medium]);
+
   // Adjust particle visibility based on modes
   useEffect(() => {
     if (particlesRef.current) {

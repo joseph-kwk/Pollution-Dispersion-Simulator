@@ -4,6 +4,9 @@ export interface Vector2D {
   y: number;
 }
 
+// Environment types
+export type EnvironmentMedium = 'air' | 'water';
+
 export interface SimulationParameters {
   windDirection: number;
   windSpeed: number;
@@ -12,6 +15,7 @@ export interface SimulationParameters {
   viscosity: number;
   decayFactor: number;
   simulationSpeed: number;
+  medium: EnvironmentMedium; // New field
 }
 
 export interface PollutantType {
@@ -28,6 +32,7 @@ export interface PollutantType {
     organicGrowth?: number;
   };
   effects: string[];
+  compatibleMedia: EnvironmentMedium[]; // New field to restrict pollutants to specific media
 }
 
 export interface PollutionSource {
@@ -66,7 +71,6 @@ export interface ControlGroup {
 }
 
 // Store types
-// Store types
 export interface SimulationStore extends SimulationState {
   actions: {
     start: () => void;
@@ -85,6 +89,7 @@ export interface SimulationStore extends SimulationState {
     addObstacle: (x: number, y: number) => void;
     removeObstacle: (x: number, y: number) => void;
     setFPS: (fps: number) => void;
+    setMedium: (medium: EnvironmentMedium) => void; // New action
   };
 }
 
@@ -95,65 +100,98 @@ export const POLLUTANT_TYPES = {
     id: 'co2',
     name: 'Carbon Dioxide (CO2)',
     description: 'Greenhouse gas. Heavier than air, accumulates in low-lying areas. Invisible but dangerous in high concentrations.',
-    baseColor: { r: 100, g: 116, b: 139 }, // Slate grey (invisible in reality, visualized as grey)
+    baseColor: { r: 100, g: 116, b: 139 }, // Slate grey
     diffusionModifier: 1.0,
     behavior: {
-      sinkRate: 0.15, // Sinks (Heavy gas)
+      sinkRate: 0.15, // Sinks
       reactivity: 0.0,
       viscosity: 0.9,
     },
-    effects: ['asphyxiation', 'acidification']
+    effects: ['asphyxiation', 'acidification'],
+    compatibleMedia: ['air']
   },
   PM25: {
     id: 'pm25',
     name: 'PM2.5 (Particulate Matter)',
     description: 'Fine particles <2.5µm. Penetrates deep into lungs. Found in smoke, haze, and vehicle exhaust.',
-    baseColor: { r: 168, g: 85, b: 247 }, // Purple for high danger/haze
-    diffusionModifier: 0.6, // Suspended longer
+    baseColor: { r: 168, g: 85, b: 247 }, // Purple
+    diffusionModifier: 0.6,
     behavior: {
-      sinkRate: 0.02, // Lofts/Suspends
+      sinkRate: 0.02, // Lofts
       reactivity: 0.1,
       viscosity: 1.1,
     },
-    effects: ['respiratory', 'cardiovascular']
+    effects: ['respiratory', 'cardiovascular'],
+    compatibleMedia: ['air']
   },
   NO2: {
     id: 'no2',
     name: 'Nitrogen Dioxide (NO2)',
     description: 'Reddish-brown gas involved in smog formation. Emitted by combustion engines and power plants.',
-    baseColor: { r: 180, g: 83, b: 9 }, // Brown/Amber
+    baseColor: { r: 180, g: 83, b: 9 }, // Brown
     diffusionModifier: 1.1,
     behavior: {
-      sinkRate: 0.05, // Slightly heavier than air
-      reactivity: 0.8, // Highly reactive (Ozone precursor)
+      sinkRate: 0.05,
+      reactivity: 0.8,
       viscosity: 1.0,
     },
-    effects: ['lungIrritation', 'smog']
+    effects: ['lungIrritation', 'smog'],
+    compatibleMedia: ['air']
   },
   SO2: {
     id: 'so2',
     name: 'Sulfur Dioxide (SO2)',
     description: 'Colorless, pungent gas from burning fossil fuels. Precursor to acid rain and particulate formation.',
-    baseColor: { r: 234, g: 179, b: 8 }, // Yellowish (sulfur association)
+    baseColor: { r: 234, g: 179, b: 8 }, // Yellow
     diffusionModifier: 1.2,
     behavior: {
       sinkRate: 0.08,
       reactivity: 0.6,
       viscosity: 1.0,
     },
-    effects: ['acidRain', 'respiratory']
+    effects: ['acidRain', 'respiratory'],
+    compatibleMedia: ['air']
   },
   RADON: {
     id: 'radon',
     name: 'Radon Gas',
     description: 'Radioactive, colorless, odorless. Heaviest gas, accumulates significantly in basements/low spots.',
-    baseColor: { r: 255, g: 100, b: 100 }, // Warning Red (Radioactive)
-    diffusionModifier: 0.4, // Slow diffusion
+    baseColor: { r: 255, g: 100, b: 100 }, // Red
+    diffusionModifier: 0.4,
     behavior: {
-      sinkRate: 0.4, // Very heavy
+      sinkRate: 0.4,
       reactivity: 0.01,
       viscosity: 1.5,
     },
-    effects: ['cancer', 'radiation']
+    effects: ['cancer', 'radiation'],
+    compatibleMedia: ['air']
+  },
+  CRUDE_OIL: {
+    id: 'oil',
+    name: 'Crude Oil',
+    description: 'Thick, viscous liquid hydrocarbon. Floats on water surfaces and forms slicks. Highly damaging to marine life.',
+    baseColor: { r: 20, g: 20, b: 20 }, // Black/Dark Brown
+    diffusionModifier: 0.2, // Very slow diffusion (updates cohesion)
+    behavior: {
+      sinkRate: -0.2, // Floats (Negative sink rate = Buoyant)
+      reactivity: 0.05,
+      viscosity: 5.0, // Very viscous
+    },
+    effects: ['coating', 'toxicity'],
+    compatibleMedia: ['water']
+  },
+  DYE: {
+    id: 'dye',
+    name: 'Industrial Dye / Chemical Spill',
+    description: 'Soluble chemical agent. Mixes readily with water, tracking currents and turbulent flow.',
+    baseColor: { r: 16, g: 185, b: 129 }, // Bright Green (Tracer Dye)
+    diffusionModifier: 1.5, // High diffusion
+    behavior: {
+      sinkRate: 0.0, // Neutrally buoyant
+      reactivity: 0.2,
+      viscosity: 1.0,
+    },
+    effects: ['contamination', 'discoloration'],
+    compatibleMedia: ['water']
   }
 } as const;

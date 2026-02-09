@@ -126,7 +126,9 @@ export class FluidDynamics {
 
   private solveVelocity(parameters: SimulationParameters): void {
     const N = this.gridSize;
-    const visc = parameters.viscosity * 0.0001;
+    // Water is approx 50-100x more viscous than air. We scale the user param accordingly.
+    const mediumViscScale = parameters.medium === 'water' ? 0.0005 : 0.0001;
+    const visc = parameters.viscosity * mediumViscScale;
     const windSpeed = parameters.windSpeed;
     const windDir = parameters.windDirection;
 
@@ -164,7 +166,9 @@ export class FluidDynamics {
 
   private solveDensity(parameters: SimulationParameters, sources: PollutionSource[]): void {
     const N = this.gridSize;
-    const diff = parameters.diffusionRate * 0.0001;
+    // Pollution diffuses much slower in liquids.
+    const mediumDiffScale = parameters.medium === 'water' ? 0.00002 : 0.0001;
+    const diff = parameters.diffusionRate * mediumDiffScale;
 
     // Add Sources
     sources.forEach(source => {
