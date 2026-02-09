@@ -12,8 +12,30 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { Camera, Play, Pause, RotateCcw } from 'lucide-react';
 import { SimulationCommentary } from './SimulationCommentary';
 
-const PARTICLE_COUNT = 8000;
-const PARTICLE_SIZE = 0.2;
+const PARTICLE_COUNT = 15000; // Increased for better volume
+const PARTICLE_SIZE = 4.0; // Much larger for smoke effect
+
+// Helper to create a soft smoke-like texture
+const createSmokeTexture = () => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 32;
+  canvas.height = 32;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  // Radial gradient for soft puff
+  const gradient = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+  gradient.addColorStop(0, 'rgba(255, 255, 255, 1)'); // Bright center
+  gradient.addColorStop(0.4, 'rgba(255, 255, 255, 0.4)');
+  gradient.addColorStop(1, 'rgba(255, 255, 255, 0)'); // Transparent edge
+
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 32, 32);
+
+  const texture = new THREE.Texture(canvas);
+  texture.needsUpdate = true;
+  return texture;
+};
 
 const getAQIEmoji = (aqi: number) => {
   if (aqi <= 50) return { emoji: '😊', label: 'Good', color: '#10b981' };
@@ -102,7 +124,7 @@ export const ThreeDSimulationCanvas: React.FC = () => {
       0.85  // threshold
     );
     // Adjust bloom parameters for aesthetics
-    bloomPass.strength = 1.2;
+    bloomPass.strength = 0.8; // Reduced slighty for smoke clarity
     bloomPass.radius = 0.5;
     bloomPass.threshold = 0.2;
 
@@ -151,6 +173,7 @@ export const ThreeDSimulationCanvas: React.FC = () => {
     const colors = new Float32Array(PARTICLE_COUNT * 3);
     const velocities = new Float32Array(PARTICLE_COUNT * 3);
     const lifetimes = new Float32Array(PARTICLE_COUNT);
+    const sizes = new Float32Array(PARTICLE_COUNT); // Per-particle size
 
     for (let i = 0; i < PARTICLE_COUNT; i++) {
       const i3 = i * 3;
@@ -170,18 +193,29 @@ export const ThreeDSimulationCanvas: React.FC = () => {
       velocities[i3 + 2] = (Math.random() - 0.5) * 0.1;
 
       lifetimes[i] = Math.random();
+      sizes[i] = 1.0; // Initial scale
     }
 
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geometry.setAttribute('velocity', new THREE.BufferAttribute(velocities, 3));
     geometry.setAttribute('lifetime', new THREE.BufferAttribute(lifetimes, 1));
+    geometry.setAttribute('pSize', new THREE.BufferAttribute(sizes, 1));
+
+    // Custom shader material for per-particle sizing or standard PointsMaterial
+    // Using standard PointsMaterial with size attenuation is easier but uniform size.
+    // To have variable size per particle efficiently without custom shader, we can use simple size attenuation
+    // but typically Points have one 'size' uniform. 
+    // However, for smoke, consistent large puffs work well. We'll stick to PointsMaterial with a texture.
+
+    const smokeTexture = createSmokeTexture();
 
     const material = new THREE.PointsMaterial({
       size: PARTICLE_SIZE,
+      map: smokeTexture || undefined, // Use texture if generated
       vertexColors: true,
       transparent: true,
-      opacity: 0.8,
+      opacity: 0.15, // Low opacity for accumulation effect
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       sizeAttenuation: true,
@@ -195,8 +229,19 @@ export const ThreeDSimulationCanvas: React.FC = () => {
     fluidDynamicsRef.current = new FluidDynamics(GRID_SIZE);
     fluidDynamicsRef.current.setGPUEnabled(gpuEnabled);
 
-    console.log('Three.js scene initialized with', PARTICLE_COUNT, 'particles');
-  }, [gpuEnabled, scientistMode]);
+    console.log('Three.js scene initialized with', PARTICLE_COUNT, 'smoke particles');
+  }, [gpuEnabled]);
+
+  // Adjust particle visibility based on modes
+  useEffect(() => {
+    if (particlesRef.current) {
+      const material = particlesRef.current.material as THREE.PointsMaterial;
+      // Dim particles in Scientist Mode to see vectors clearly
+      material.opacity = scientistMode ? 0.05 : 0.15; // Even lower in scientist mode
+      material.size = scientistMode ? PARTICLE_SIZE * 0.7 : PARTICLE_SIZE;
+      material.needsUpdate = true;
+    }
+  }, [scientistMode]);
 
   const updateParticles = useCallback((currentWindDir: number, currentWindSpeed: number) => {
     if (!particlesRef.current || !fluidDynamicsRef.current) return;
@@ -205,6 +250,7 @@ export const ThreeDSimulationCanvas: React.FC = () => {
     const colors = particlesRef.current.geometry.attributes.color.array as Float32Array;
     const velocities = particlesRef.current.geometry.attributes.velocity.array as Float32Array;
     const lifetimes = particlesRef.current.geometry.attributes.lifetime.array as Float32Array;
+    // We aren't using pSize attribute with standard material, but we update positions/colors.
 
     const grid = fluidDynamicsRef.current.getDensity();
     const gridU = fluidDynamicsRef.current.getVelocityX();
@@ -221,23 +267,28 @@ export const ThreeDSimulationCanvas: React.FC = () => {
 
       // Update lifetime
       lifetimes[i] += 0.01;
-      if (lifetimes[i] > 1.0) {
-        // Respawn particle at a pollution source
+
+      // Improve respawn logic to create continuous flow
+      if (lifetimes[i] > 1.0 || positions[i3 + 1] < 0) {
         if (sources.length > 0) {
           const source = sources[Math.floor(Math.random() * sources.length)];
-          positions[i3] = source.x - halfGrid + (Math.random() - 0.5) * 2;
-          positions[i3 + 1] = Math.random() * 3 + 1; // Start slightly higher
-          positions[i3 + 2] = source.y - halfGrid + (Math.random() - 0.5) * 2;
+          // Spawn in a small radius around source
+          const angle = Math.random() * Math.PI * 2;
+          const r = Math.random() * 1.5;
+          positions[i3] = source.x - halfGrid + Math.cos(angle) * r;
+          positions[i3 + 1] = 1.0 + Math.random(); // Start slighty above ground
+          positions[i3 + 2] = source.y - halfGrid + Math.sin(angle) * r;
+
           lifetimes[i] = 0;
 
-          // Reset velocity
-          velocities[i3] = windVelX + (Math.random() - 0.5) * 0.05;
-          velocities[i3 + 1] = 0.1 + Math.random() * 0.1; // Upward burst
-          velocities[i3 + 2] = windVelZ + (Math.random() - 0.5) * 0.05;
+          // Initial velocity matches wind + upward thermal
+          velocities[i3] = windVelX + (Math.random() - 0.5) * 0.02;
+          velocities[i3 + 1] = 0.05 + Math.random() * 0.05; // Thermal rise
+          velocities[i3 + 2] = windVelZ + (Math.random() - 0.5) * 0.02;
         } else {
-          // Random respawn if no sources
+          // Ambient background dust if no sources
           positions[i3] = (Math.random() - 0.5) * GRID_SIZE;
-          positions[i3 + 1] = Math.random() * 5;
+          positions[i3 + 1] = Math.random() * 10;
           positions[i3 + 2] = (Math.random() - 0.5) * GRID_SIZE;
           lifetimes[i] = 0;
         }
@@ -247,87 +298,59 @@ export const ThreeDSimulationCanvas: React.FC = () => {
       const gridX = Math.floor(positions[i3] + halfGrid);
       const gridZ = Math.floor(positions[i3 + 2] + halfGrid);
 
-      // Sample fluid velocity field
-      let fluidU = 0;
-      let fluidV = 0;
-      let density = 0;
-
+      // Fluid dynamics advection
+      let fluidU = 0, fluidV = 0, density = 0;
       if (gridX >= 0 && gridX < GRID_SIZE && gridZ >= 0 && gridZ < GRID_SIZE) {
         fluidU = gridU[gridZ][gridX];
         fluidV = gridV[gridZ][gridX];
         density = grid[gridZ][gridX];
       }
 
-      // Apply fluid velocity forces (Advection)
-      // We blend the particle's current velocity with the fluid velocity
-      velocities[i3] += (fluidU * 0.15 - velocities[i3] * 0.03);
-      velocities[i3 + 2] += (fluidV * 0.15 - velocities[i3 + 2] * 0.03);
+      // Advection: Particles follow flow
+      velocities[i3] += (fluidU * 0.15 - velocities[i3] * 0.02);
+      velocities[i3 + 2] += (fluidV * 0.15 - velocities[i3 + 2] * 0.02);
 
-      // Update position
+      // Movement
       positions[i3] += velocities[i3];
       positions[i3 + 1] += velocities[i3 + 1];
       positions[i3 + 2] += velocities[i3 + 2];
 
-      // Apply turbulence
-      positions[i3] += (Math.random() - 0.5) * 0.02;
-      positions[i3 + 2] += (Math.random() - 0.5) * 0.02;
-
-      // Determine dominant pollutant type at this location
+      // Buoyancy/Gravity based on pollutant type
       let dominantType = sources.length > 0 ? sources[0].type : 'CO2';
-      if (sources.length > 1) {
-        // Find closest source
-        let minDist = Infinity;
-        sources.forEach(source => {
-          const dx = positions[i3] - (source.x - halfGrid);
-          const dz = positions[i3 + 2] - (source.y - halfGrid);
-          const dist = dx * dx + dz * dz;
-          if (dist < minDist) {
-            minDist = dist;
-            dominantType = source.type;
-          }
-        });
-      }
-
-      // Apply vertical movement based on pollutant properties (Buoyancy/Gravity)
+      // (Simplified source finding for perf)
       const pollutantDef = POLLUTANT_TYPES[dominantType];
-      // sinkRate > 0 means it sinks (gravity), < 0 means it rises (buoyancy)
-      velocities[i3 + 1] -= pollutantDef.behavior.sinkRate * 0.005;
+      velocities[i3 + 1] -= pollutantDef.behavior.sinkRate * 0.003;
 
-      // Floor collision
-      if (positions[i3 + 1] < 0) {
-        positions[i3 + 1] = 0;
-        velocities[i3 + 1] *= -0.5; // Bounce
+      // Floor interaction
+      if (positions[i3 + 1] < 0.1) {
+        positions[i3 + 1] = 0.1;
+        velocities[i3 + 1] *= -0.2; // Damping bounce
       }
 
-      // Color based on density and pollutant type
-      const normalizedDensity = Math.min(density / 200, 1.0); // Slightly more sensitive
+      // Coloring Logic
+      // Normalize density 0-255 maps to 0-1 opacity/intensity
+      const normalizedDensity = Math.min(density / 150, 1.0);
 
-      // Base ambient color (very dark blue/gray for air)
-      const ambientR = 0.05, ambientG = 0.05, ambientB = 0.1;
+      if (normalizedDensity > 0.01) {
+        const base = pollutantDef.baseColor;
+        // Tint based on density: White (low) -> Color (high)
+        // Actually usually Smoke is Thin (Alpha low) -> Thick (Alpha high)
+        // With additive blending, we want Bright colors.
 
-      if (normalizedDensity > 0.02) { // Only colorize if there's significant pollution
-        const color = pollutantDef.baseColor;
-        // Boost color for bloom effect
-        const boost = 1.5;
-        const r = (color.r / 255) * boost;
-        const g = (color.g / 255) * boost;
-        const b = (color.b / 255) * boost;
+        // Interpolate white -> baseColor
+        const r = 1.0 * (1 - normalizedDensity) + (base.r / 255) * normalizedDensity;
+        const g = 1.0 * (1 - normalizedDensity) + (base.g / 255) * normalizedDensity;
+        const b = 1.0 * (1 - normalizedDensity) + (base.b / 255) * normalizedDensity;
 
-        colors[i3] = r * normalizedDensity + ambientR * (1 - normalizedDensity);
-        colors[i3 + 1] = g * normalizedDensity + ambientG * (1 - normalizedDensity);
-        colors[i3 + 2] = b * normalizedDensity + ambientB * (1 - normalizedDensity);
+        colors[i3] = r;
+        colors[i3 + 1] = g;
+        colors[i3 + 2] = b;
       } else {
-        colors[i3] = ambientR;
-        colors[i3 + 1] = ambientG;
-        colors[i3 + 2] = ambientB;
+        // Faint ambient dust
+        colors[i3] = 0.05;
+        colors[i3 + 1] = 0.05;
+        colors[i3 + 2] = 0.1;
       }
-
-      // Wrap around boundaries
-      if (positions[i3] < -halfGrid) positions[i3] = halfGrid;
-      if (positions[i3] > halfGrid) positions[i3] = -halfGrid;
-      if (positions[i3 + 2] < -halfGrid) positions[i3 + 2] = halfGrid;
-      if (positions[i3 + 2] > halfGrid) positions[i3 + 2] = -halfGrid;
-      if (positions[i3 + 1] < 0) positions[i3 + 1] = 10;
     }
 
     particlesRef.current.geometry.attributes.position.needsUpdate = true;
@@ -368,42 +391,88 @@ export const ThreeDSimulationCanvas: React.FC = () => {
     }
   }, [scientistMode, parameters.windDirection, parameters.windSpeed]);
 
+  const obstaclesRef = useRef(obstacles);
+
+  // Keep obstaclesRef in sync
+  useEffect(() => {
+    obstaclesRef.current = obstacles;
+  }, [obstacles]);
+
   // Handle mouse interaction for drawing obstacles
   useEffect(() => {
     if (!containerRef.current || !cameraRef.current || !planeRef.current) return;
 
-    const handleMouseDown = (event: MouseEvent) => {
-      if (!isDrawingObstacles) return;
+    let isDragging = false;
+    let dragMode: 'add' | 'remove' | null = null;
 
+    const getGridPos = (event: MouseEvent) => {
       const rect = containerRef.current!.getBoundingClientRect();
-      mouseRef.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-      mouseRef.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
+      mouseRef.current.set(x, y);
       raycasterRef.current.setFromCamera(mouseRef.current, cameraRef.current!);
       const intersects = raycasterRef.current.intersectObject(planeRef.current!);
 
       if (intersects.length > 0) {
         const point = intersects[0].point;
         const halfGrid = GRID_SIZE / 2;
-        const x = Math.floor(point.x + halfGrid);
-        const y = Math.floor(point.z + halfGrid);
+        const gridX = Math.floor(point.x + halfGrid);
+        const gridY = Math.floor(point.z + halfGrid);
+        return { x: gridX, y: gridY };
+      }
+      return null;
+    };
 
-        if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
-          // Toggle obstacle
-          if (obstacles[y][x]) {
-            actions.removeObstacle(x, y);
-          } else {
-            actions.addObstacle(x, y);
-          }
+    const handleMouseDown = (event: MouseEvent) => {
+      if (!isDrawingObstacles) return;
+      isDragging = true;
+
+      const pos = getGridPos(event);
+      if (pos && pos.x >= 0 && pos.x < GRID_SIZE && pos.y >= 0 && pos.y < GRID_SIZE) {
+        // Determine mode based on starting cell, using Ref to avoid stale state
+        dragMode = obstaclesRef.current[pos.y][pos.x] ? 'remove' : 'add';
+
+        // Execute initial action
+        if (dragMode === 'add') actions.addObstacle(pos.x, pos.y);
+        else actions.removeObstacle(pos.x, pos.y);
+      }
+    };
+
+    const handleMouseMove = (event: MouseEvent) => {
+      if (!isDrawingObstacles || !isDragging || !dragMode) return;
+
+      const pos = getGridPos(event);
+      if (pos && pos.x >= 0 && pos.x < GRID_SIZE && pos.y >= 0 && pos.y < GRID_SIZE) {
+        // Apply consistent action
+        // Check against Ref to see if we actually need to change it
+        const currentVal = obstaclesRef.current[pos.y][pos.x];
+
+        if (dragMode === 'add' && !currentVal) {
+          actions.addObstacle(pos.x, pos.y);
+        } else if (dragMode === 'remove' && currentVal) {
+          actions.removeObstacle(pos.x, pos.y);
         }
       }
     };
 
-    containerRef.current.addEventListener('mousedown', handleMouseDown);
-    return () => {
-      containerRef.current?.removeEventListener('mousedown', handleMouseDown);
+    const handleMouseUp = () => {
+      isDragging = false;
+      dragMode = null;
     };
-  }, [isDrawingObstacles, obstacles, actions]);
+
+    const container = containerRef.current;
+    container.addEventListener('mousedown', handleMouseDown);
+    container.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      container.removeEventListener('mousedown', handleMouseDown);
+      container.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+    // Removed 'obstacles' from dependency array to prevent effect churn
+  }, [isDrawingObstacles, actions]);
 
   // Update obstacle visuals
   useEffect(() => {
@@ -585,6 +654,7 @@ export const ThreeDSimulationCanvas: React.FC = () => {
         height: '100%',
         position: 'relative',
         background: 'linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 100%)',
+        cursor: isDrawingObstacles ? 'crosshair' : 'default',
       }}
     >
       {/* Screenshot Button */}
@@ -624,21 +694,27 @@ export const ThreeDSimulationCanvas: React.FC = () => {
       </button>
 
       {/* Real-time Commentary Overlay */}
+      {/* Real-time Commentary Overlay */}
       <div style={{
-        position: 'absolute',
-        top: '1rem',
-        right: '1rem',
-        width: '320px',
+        // Allow CSS to handle positioning (main.css .simulation-commentary)
         zIndex: 50,
-        pointerEvents: 'none' // Allow clicking through to canvas
+        pointerEvents: 'none', // Allow clicking through to canvas
+        width: '100%',
+        height: '100%',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'flex-end',
+        paddingBottom: '2rem'
       }}>
         <div style={{ pointerEvents: 'auto' }}>
           <SimulationCommentary />
         </div>
       </div>
 
-      {/* Main Playback Controls - Top Center */}
-      <div style={{
+      <div className="tour-playback-controls" style={{
         position: 'absolute',
         top: '1rem',
         left: '50%',

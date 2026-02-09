@@ -35,6 +35,7 @@ export interface PollutionSource {
   y: number;
   type: keyof typeof POLLUTANT_TYPES;
   active: boolean;
+  releaseRate?: number; // Individual release rate (0.0 to 1.0)
 }
 
 export interface SimulationState {

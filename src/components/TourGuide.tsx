@@ -18,31 +18,49 @@ const TOUR_STEPS: TourStep[] = [
   {
     target: '[data-tour="simulation-canvas"]',
     title: '3D Simulation View',
-    content: 'This is where the magic happens. Watch particles react to wind, gravity, and obstacles in real-time. You can rotate and zoom the camera.',
+    content: 'This is where the magic happens. Watch particles react to wind, gravity, and obstacles in real-time. You can rotate and zoom using your mouse.',
+    position: 'center'
+  },
+  {
+    target: '.tour-playback-controls',
+    title: 'Playback Controls',
+    content: 'Start, pause, or reset the simulation at any time. Use the camera icon to take screenshots of your experiments.',
+    position: 'bottom'
+  },
+  {
+    target: '[data-tour="env-controls"]',
+    title: 'Environment Controls',
+    content: 'Adjust wind speed, direction, and diffusion rates. Save your configurations or export data as CSV.',
     position: 'right'
   },
   {
-    target: '[data-tour="controls-panel"]',
-    title: 'Control Center',
-    content: 'Adjust environmental parameters like wind speed and direction. You can also add different types of pollution sources here.',
+    target: '[data-tour="pollution-sources"]',
+    title: 'Pollution Sources',
+    content: 'Add different pollutants like CO2, PM2.5, or SO2. Each behaves differently based on real-world physics (e.g., heavy gases sink).',
     position: 'right'
   },
   {
     target: '[data-tour="settings-section"]',
-    title: 'Advanced Tools',
-    content: 'Enable "Scientist Mode" to see vector fields, or "Draw Obstacles" to place walls and buildings in the simulation.',
+    title: 'Scientific Tools',
+    content: 'Enable "Scientist Mode" to visualize wind vectors, or use "Build Walls" to draw obstacles and test dispersion around buildings.',
     position: 'right'
   },
   {
+    target: '.simulation-commentary',
+    title: 'Intelligent Guide',
+    content: 'Keep an eye on this smart assistant! It analyzes your simulation in real-time and provides physics-based insights and warnings.',
+    position: 'top'
+  },
+  {
     target: '[data-tour="pollution-insights"]',
-    title: 'Real-Time Insights',
-    content: 'Monitor the Air Quality Index (AQI) and see live graphs of pollution levels. Download reports for your analysis.',
-    position: 'left'
+    title: 'Real-Time Data',
+    content: 'Monitor the live Air Quality Index (AQI) and see how pollutant concentrations change over time.',
+    position: 'right'
   },
   {
     target: '[data-tour="case-studies-nav"]',
     title: 'Case Studies',
-    content: 'Explore pre-configured scenarios based on real-world pollution events like oil spills or industrial accidents.',
+    content: 'Explore pre-made scenarios like "Urban Rush Hour" or "Industrial Leak" to see pollution dynamics in specific situations.',
     position: 'bottom'
   }
 ];
@@ -50,7 +68,7 @@ const TOUR_STEPS: TourStep[] = [
 export const TourGuide: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
-  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [position, setPosition] = useState<any>({ top: 0, left: 0, transform: 'translate(0, 0)' });
 
   useEffect(() => {
     // Check if first time user
@@ -72,11 +90,12 @@ export const TourGuide: React.FC = () => {
     if (!isOpen) return;
 
     const step = TOUR_STEPS[currentStep];
-    
+
     if (step.position === 'center') {
-      setPosition({ 
-        top: window.innerHeight / 2, 
-        left: window.innerWidth / 2 
+      setPosition({
+        top: window.innerHeight / 2,
+        left: window.innerWidth / 2,
+        transform: 'translate(-50%, -50%)'
       });
       return;
     }
@@ -86,36 +105,74 @@ export const TourGuide: React.FC = () => {
       const rect = element.getBoundingClientRect();
       let top = 0;
       let left = 0;
+      let transform = 'translate(0, 0)';
 
       switch (step.position) {
         case 'right':
           top = rect.top + rect.height / 2;
           left = rect.right + 20;
+          transform = 'translate(0, -50%)';
           break;
         case 'left':
           top = rect.top + rect.height / 2;
-          left = rect.left - 320; // Approximate width of card
+          left = rect.left - 20;
+          transform = 'translate(-100%, -50%)';
           break;
         case 'bottom':
           top = rect.bottom + 20;
           left = rect.left + rect.width / 2;
+          transform = 'translate(-50%, 0)';
           break;
         case 'top':
-          top = rect.top - 200;
+          top = rect.top - 20;
           left = rect.left + rect.width / 2;
+          transform = 'translate(-50%, -100%)';
           break;
       }
 
-      // Keep within bounds
-      if (left < 20) left = 20;
-      if (left > window.innerWidth - 340) left = window.innerWidth - 340;
-      if (top < 20) top = 20;
-      if (top > window.innerHeight - 200) top = window.innerHeight - 200;
+      // Smart bounds checking
+      const CARD_WIDTH = 320;
+      const MARGIN = 20;
 
-      setPosition({ top, left });
-      
+      // Ensure horizontal visibility based on transform origin
+      if (step.position === 'right') {
+        if (left + CARD_WIDTH + MARGIN > window.innerWidth) {
+          left = window.innerWidth - CARD_WIDTH - MARGIN;
+        }
+        if (left < MARGIN) left = MARGIN;
+      } else if (step.position === 'left') {
+        if (left - CARD_WIDTH - MARGIN < 0) {
+          left = CARD_WIDTH + MARGIN;
+        }
+        if (left > window.innerWidth - MARGIN) left = window.innerWidth - MARGIN;
+      } else {
+        if (left + CARD_WIDTH / 2 + MARGIN > window.innerWidth) {
+          left = window.innerWidth - CARD_WIDTH / 2 - MARGIN;
+        }
+        if (left - CARD_WIDTH / 2 - MARGIN < 0) {
+          left = CARD_WIDTH / 2 + MARGIN;
+        }
+      }
+
+      // Vertical bounds - Avoid Header (approx 80px) and Bottom
+      const HEADER_HEIGHT = 80;
+      const CARD_HALF_HEIGHT = 125; // Estimate half card height
+
+      // If the calculated top position puts the top of the card under the header
+      if (top - CARD_HALF_HEIGHT < HEADER_HEIGHT) {
+        top = HEADER_HEIGHT + CARD_HALF_HEIGHT + MARGIN;
+      }
+
+      // If the calculated top position puts the bottom of the card off screen
+      if (top + CARD_HALF_HEIGHT > window.innerHeight - MARGIN) {
+        top = window.innerHeight - CARD_HALF_HEIGHT - MARGIN;
+      }
+
+      setPosition({ top, left, transform } as any);
+
       // Scroll to element if needed
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Use 'auto' instead of 'smooth' to ensure getBoundingClientRect is accurate immediately
+      element.scrollIntoView({ behavior: 'auto', block: 'center' });
     }
   }, [currentStep, isOpen]);
 
@@ -145,7 +202,7 @@ export const TourGuide: React.FC = () => {
   return (
     <>
       {/* Backdrop */}
-      <div 
+      <div
         style={{
           position: 'fixed',
           top: 0,
@@ -155,19 +212,19 @@ export const TourGuide: React.FC = () => {
           background: 'rgba(0,0,0,0.5)',
           zIndex: 9998,
           pointerEvents: 'none' // Allow clicking through if needed, but usually we block
-        }} 
+        }}
       />
-      
+
       {/* Highlight Box (Optional - for now just the card) */}
-      
+
       {/* Tour Card */}
-      <div 
+      <div
         className="tour-card"
         style={{
           position: 'fixed',
-          top: step.position === 'center' ? '50%' : position.top,
-          left: step.position === 'center' ? '50%' : position.left,
-          transform: step.position === 'center' ? 'translate(-50%, -50%)' : 'translate(0, -50%)',
+          top: position.top,
+          left: position.left,
+          transform: (position as any).transform || 'translate(0, 0)',
           width: '320px',
           background: 'rgba(15, 23, 42, 0.95)',
           backdropFilter: 'blur(20px)',
@@ -180,7 +237,7 @@ export const TourGuide: React.FC = () => {
           transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
         }}
       >
-        <button 
+        <button
           onClick={handleClose}
           style={{
             position: 'absolute',
@@ -195,9 +252,9 @@ export const TourGuide: React.FC = () => {
           <X size={16} />
         </button>
 
-        <div style={{ 
-          fontSize: '12px', 
-          textTransform: 'uppercase', 
+        <div style={{
+          fontSize: '12px',
+          textTransform: 'uppercase',
           letterSpacing: '1px',
           color: '#8b5cf6',
           marginBottom: '8px',
@@ -214,7 +271,7 @@ export const TourGuide: React.FC = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', gap: '4px' }}>
             {TOUR_STEPS.map((_, idx) => (
-              <div 
+              <div
                 key={idx}
                 style={{
                   width: '6px',
@@ -228,7 +285,7 @@ export const TourGuide: React.FC = () => {
 
           <div style={{ display: 'flex', gap: '8px' }}>
             {currentStep > 0 && (
-              <button 
+              <button
                 onClick={handlePrev}
                 className="btn btn-secondary"
                 style={{ padding: '8px 12px', fontSize: '12px' }}
@@ -236,7 +293,7 @@ export const TourGuide: React.FC = () => {
                 Back
               </button>
             )}
-            <button 
+            <button
               onClick={handleNext}
               className="btn btn-primary"
               style={{ padding: '8px 16px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}

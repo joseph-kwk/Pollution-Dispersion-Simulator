@@ -169,7 +169,7 @@ export class FluidDynamics {
     // Add Sources
     sources.forEach(source => {
       if (source.active) {
-        this.addDensitySource(source.x, source.y, parameters.releaseRate);
+        this.addDensitySource(source.x, source.y, source.releaseRate !== undefined ? source.releaseRate : parameters.releaseRate);
       }
     });
 

@@ -8,6 +8,7 @@ import { StatusBar } from './components/StatusBar';
 import { PollutionInsights } from './components/PollutionInsights';
 import { CaseStudies } from './components/CaseStudies';
 import { TourGuide } from './components/TourGuide';
+import { SimulationCommentary } from './components/SimulationCommentary';
 import { MobileNotice } from './components/MobileNotice';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
@@ -26,6 +27,7 @@ const SimulatorPage: React.FC = () => {
 
         <div className="simulation-container">
           <ThreeDSimulationCanvas />
+          <SimulationCommentary />
         </div>
       </main>
     </>

@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { useSimulationStore } from '../stores/simulationStore';
 import { useShareableURL } from '../hooks/useShareableURL';
 import { POLLUTANT_TYPES, GRID_SIZE } from '../types';
-import { Wind, Waves, Droplets, Plus, Trash2, Download, Upload, FileJson, CheckCircle, AlertCircle, X, Info, Keyboard, Share2 } from 'lucide-react';
+import { Wind, Waves, Droplets, Plus, Trash2, Download, Upload, FileJson, CheckCircle, AlertCircle, X, Info, Keyboard, Share2, Zap, Microscope, PenTool, CloudLightning, MapPin, Activity } from 'lucide-react';
 
 export const ControlPanel: React.FC = () => {
   const { parameters, sources, gpuEnabled, scientistMode, isDrawingObstacles, actions } = useSimulationStore();
@@ -14,6 +14,21 @@ export const ControlPanel: React.FC = () => {
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
   const [showShareTooltip, setShowShareTooltip] = useState(false);
   const { generateShareURL } = useShareableURL();
+
+  const handleExportCSV = () => {
+    const { grid } = useSimulationStore.getState();
+    // Rotate grid to match visual orientation if needed, but raw dump is usually row-major (y)
+    // Grid is number[][], representing density
+    const rows = grid.map(row => row.map(val => val.toFixed(2)).join(','));
+    const csvContent = "data:text/csv;charset=utf-8," + rows.join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `pollution_data_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   useEffect(() => {
     const handleKeyboardSave = () => setShowExportModal(true);
@@ -61,6 +76,7 @@ export const ControlPanel: React.FC = () => {
       },
       parameters,
       sources,
+      obstacles: useSimulationStore.getState().obstacles,
       settings: {
         gpuEnabled,
         scientistMode
@@ -109,6 +125,9 @@ export const ControlPanel: React.FC = () => {
       actions.updateParameters(importedConfig.parameters);
       actions.removeSource(0);
       importedConfig.sources.forEach((source: any) => actions.addSource(source));
+      if (importedConfig.obstacles) {
+        actions.setObstacles(importedConfig.obstacles);
+      }
       if (importedConfig.settings) {
         if (importedConfig.settings.gpuEnabled !== gpuEnabled) actions.toggleGPU();
         if (importedConfig.settings.scientistMode !== scientistMode) actions.toggleScientistMode();
@@ -133,15 +152,23 @@ export const ControlPanel: React.FC = () => {
             onClick={handleExport}
             title="Save current configuration (S)"
           >
-            <Download style={{ width: '16px', height: '16px' }} />
+            <Download />
             Save
+          </button>
+          <button
+            className="btn btn-secondary ripple scale-hover"
+            onClick={handleExportCSV}
+            title="Export simulation data as CSV"
+          >
+            <FileJson />
+            CSV
           </button>
           <button
             className="btn btn-secondary ripple scale-hover"
             onClick={() => fileInputRef.current?.click()}
             title="Load configuration"
           >
-            <Upload style={{ width: '16px', height: '16px' }} />
+            <Upload />
             Load
           </button>
           <button
@@ -150,17 +177,17 @@ export const ControlPanel: React.FC = () => {
             title="Share simulation URL"
             style={{ position: 'relative' }}
           >
-            <Share2 style={{ width: '16px', height: '16px' }} />
+            <Share2 />
             Share
             {showShareTooltip && (
               <span style={{
                 position: 'absolute',
-                top: '-30px',
+                top: '-25px',
                 left: '50%',
                 transform: 'translateX(-50%)',
                 background: '#10b981',
                 color: 'white',
-                padding: '4px 8px',
+                padding: '2px 6px',
                 borderRadius: '4px',
                 fontSize: '10px',
                 whiteSpace: 'nowrap',
@@ -175,10 +202,10 @@ export const ControlPanel: React.FC = () => {
           className="btn btn-secondary ripple scale-hover"
           onClick={() => setShowShortcutsHelp(true)}
           title="View keyboard shortcuts (?)"
-          style={{ width: '100%', marginTop: '8px' }}
+          style={{ width: '100%', marginTop: '4px', padding: '6px' }}
         >
-          <Keyboard style={{ width: '16px', height: '16px' }} />
-          Shortcuts
+          <Keyboard />
+          Keyboard Shortcuts
         </button>
         <input
           type="file"
@@ -467,61 +494,71 @@ export const ControlPanel: React.FC = () => {
       <div className="control-section" data-tour="settings-section">
         <h3 className="section-title">Settings</h3>
 
-        {/* GPU Toggle */}
-        <div className="toggle-container" style={{ marginBottom: '12px' }}>
-          <div>
-            <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>GPU Acceleration</div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
-              {gpuEnabled ? 'GPU: Enabled' : 'GPU: Disabled'}
+        <div className="settings-grid">
+          {/* GPU Toggle */}
+          <button
+            className={`setting-card ${gpuEnabled ? 'active' : ''}`}
+            onClick={actions.toggleGPU}
+            title={gpuEnabled ? "Disable GPU Acceleration" : "Enable GPU Acceleration"}
+          >
+            <div className="setting-icon-wrapper">
+              <Zap size={20} />
             </div>
-          </div>
-          <div className={`toggle-switch ${gpuEnabled ? 'active' : ''}`} onClick={actions.toggleGPU}>
-            <div className="toggle-thumb"></div>
-          </div>
-        </div>
+            <div className="setting-content">
+              <div className="setting-title">GPU Accel</div>
+              <div className="setting-status">{gpuEnabled ? 'On' : 'Off'}</div>
+            </div>
+          </button>
 
-        {/* Scientist Mode Toggle */}
-        <div className="toggle-container" style={{ marginBottom: '12px' }}>
-          <div>
-            <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>Scientist Mode</div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
-              Show grid & vectors
+          {/* Scientist Mode Toggle */}
+          <button
+            className={`setting-card ${scientistMode ? 'active' : ''}`}
+            onClick={actions.toggleScientistMode}
+            title="Toggle Scientist Mode (Grid & Vectors)"
+          >
+            <div className="setting-icon-wrapper">
+              <Microscope size={20} />
             </div>
-          </div>
-          <div className={`toggle-switch ${useSimulationStore(state => state.scientistMode) ? 'active' : ''}`} onClick={actions.toggleScientistMode}>
-            <div className="toggle-thumb"></div>
-          </div>
-        </div>
+            <div className="setting-content">
+              <div className="setting-title">Scientist</div>
+              <div className="setting-status">{scientistMode ? 'On' : 'Off'}</div>
+            </div>
+          </button>
 
-        {/* Draw Obstacles Toggle */}
-        <div className="toggle-container">
-          <div>
-            <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>Draw Obstacles</div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
-              Click on canvas to place walls
+          {/* Draw Obstacles Toggle */}
+          <button
+            className={`setting-card ${isDrawingObstacles ? 'active' : ''}`}
+            onClick={actions.toggleDrawingObstacles}
+            title="Click & Drag to build/erase walls"
+          >
+            <div className="setting-icon-wrapper">
+              <PenTool size={20} />
             </div>
-          </div>
-          <div className={`toggle-switch ${isDrawingObstacles ? 'active' : ''}`} onClick={actions.toggleDrawingObstacles}>
-            <div className="toggle-thumb"></div>
-          </div>
-        </div>
+            <div className="setting-content">
+              <div className="setting-title">Build Walls</div>
+              <div className="setting-status">{isDrawingObstacles ? 'Edit Mode' : 'View Mode'}</div>
+            </div>
+          </button>
 
-        {/* Dynamic Weather Toggle */}
-        <div className="toggle-container">
-          <div>
-            <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>Dynamic Weather</div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
-              Vary wind speed & direction
+          {/* Dynamic Weather Toggle */}
+          <button
+            className={`setting-card ${useSimulationStore(state => state.dynamicWeather) ? 'active' : ''}`}
+            onClick={actions.toggleDynamicWeather}
+            title="Enable dynamic changing weather"
+          >
+            <div className="setting-icon-wrapper">
+              <CloudLightning size={20} />
             </div>
-          </div>
-          <div className={`toggle-switch ${useSimulationStore(state => state.dynamicWeather) ? 'active' : ''}`} onClick={actions.toggleDynamicWeather}>
-            <div className="toggle-thumb"></div>
-          </div>
+            <div className="setting-content">
+              <div className="setting-title">Weather</div>
+              <div className="setting-status">{useSimulationStore(state => state.dynamicWeather) ? 'Dynamic' : 'Static'}</div>
+            </div>
+          </button>
         </div>
       </div>
 
       {/* Simulation Speed Controls - Kept in panel */}
-      <div className="control-section">
+      <div className="control-section" data-tour="env-controls">
         <h3 className="section-title">Simulation Settings</h3>
 
         {/* Simulation Speed */}
@@ -544,7 +581,7 @@ export const ControlPanel: React.FC = () => {
               borderRadius: '6px',
               padding: '8px',
               marginBottom: '8px',
-              color: 'rgba(255,255,255,0.9)',
+              color: 'var(--text-primary)',
               lineHeight: 1.4
             }}>
               {tooltips.simulationSpeed}
@@ -565,7 +602,7 @@ export const ControlPanel: React.FC = () => {
       </div>
 
       {/* Pollution Type */}
-      <div className="control-group">
+      <div className="control-group boxed-control">
         <label className="control-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span>Pollution Type</span>
           <button
@@ -613,7 +650,7 @@ export const ControlPanel: React.FC = () => {
       </div>
 
       {/* Pollution Sources */}
-      <div className="control-group">
+      <div className="control-group boxed-control" data-tour="pollution-sources">
         <label className="control-label">
           Pollution Sources ({sources.length})
         </label>
@@ -630,23 +667,112 @@ export const ControlPanel: React.FC = () => {
           Add Source
         </button>
         {sources.map((source, index) => (
-          <div key={index} className="source-item" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-            <div className="source-info" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '13px', fontWeight: 500 }}>
-                {index + 1}. {POLLUTANT_TYPES[source.type].name}
-              </span>
-              <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
-                Position: ({source.x}, {source.y})
-              </span>
+          <div key={index} className="source-item" style={{
+            background: 'var(--bg-secondary)',
+            borderRadius: '8px',
+            padding: '12px',
+            marginBottom: '12px',
+            border: '1px solid var(--border-color)',
+            transition: 'all 0.2s ease',
+            boxShadow: 'var(--shadow-sm)'
+          }}>
+            {/* Header: Type and Remove */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, overflow: 'hidden', marginRight: '8px' }}>
+                <div style={{
+                  width: '12px', height: '12px', borderRadius: '50%', flexShrink: 0,
+                  backgroundColor: `rgb(${POLLUTANT_TYPES[source.type].baseColor.r}, ${POLLUTANT_TYPES[source.type].baseColor.g}, ${POLLUTANT_TYPES[source.type].baseColor.b})`,
+                  boxShadow: `0 0 8px rgb(${POLLUTANT_TYPES[source.type].baseColor.r}, ${POLLUTANT_TYPES[source.type].baseColor.g}, ${POLLUTANT_TYPES[source.type].baseColor.b})`
+                }} />
+                <span style={{
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: 'var(--text-primary)',
+                  lineHeight: 1.2
+                }} title={POLLUTANT_TYPES[source.type].name}>
+                  {POLLUTANT_TYPES[source.type].name}
+                </span>
+              </div>
+
+              <button
+                className="btn btn-danger"
+                onClick={() => actions.removeSource(index)}
+                disabled={sources.length === 1}
+                title={sources.length === 1 ? "Cannot remove last source" : "Remove this source"}
+                style={{
+                  padding: '4px',
+                  height: '24px',
+                  width: '24px',
+                  minHeight: 'unset',
+                  opacity: sources.length === 1 ? 0.5 : 1,
+                  cursor: sources.length === 1 ? 'not-allowed' : 'pointer',
+                  flexShrink: 0
+                }}
+              >
+                <Trash2 size={14} />
+              </button>
             </div>
-            <button
-              className="btn btn-danger btn-sm"
-              onClick={() => actions.removeSource(index)}
-              disabled={sources.length === 1}
-              style={{ flexShrink: 0, padding: '4px 8px' }}
-            >
-              <Trash2 style={{ width: '14px', height: '14px' }} />
-            </button>
+
+            {/* Metrics Row */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '8px',
+              marginBottom: '10px'
+            }}>
+              {/* Position Metric */}
+              <div style={{
+                background: 'var(--bg-tertiary)',
+                padding: '6px 8px',
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <MapPin size={12} color="var(--text-secondary)" />
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '10px', color: 'var(--text-secondary)', lineHeight: 1 }}>Position</span>
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {source.x}, {source.y}
+                  </span>
+                </div>
+              </div>
+
+              {/* Emission Metric */}
+              <div style={{
+                background: 'var(--bg-tertiary)',
+                padding: '6px 8px',
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <Activity size={12} color="var(--text-secondary)" />
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '10px', color: 'var(--text-secondary)', lineHeight: 1 }}>Emission</span>
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {source.releaseRate !== undefined ? source.releaseRate : parameters.releaseRate}%
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Slider */}
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              className="range-input"
+              value={source.releaseRate !== undefined ? source.releaseRate : parameters.releaseRate}
+              onChange={(e) => {
+                const newSources = [...sources];
+                newSources[index] = { ...newSources[index], releaseRate: Number(e.target.value) };
+                actions.setSources(newSources);
+              }}
+              title="Drag to adjust emission intensity"
+              style={{ width: '100%', cursor: 'grab' }}
+            />
           </div>
         ))}
       </div>
@@ -680,7 +806,7 @@ export const ControlPanel: React.FC = () => {
               borderRadius: '6px',
               padding: '8px',
               marginBottom: '8px',
-              color: 'rgba(255,255,255,0.9)',
+              color: 'var(--text-primary)',
               lineHeight: 1.4
             }}>
               {tooltips.windDirection}
@@ -723,7 +849,7 @@ export const ControlPanel: React.FC = () => {
               borderRadius: '6px',
               padding: '8px',
               marginBottom: '8px',
-              color: 'rgba(255,255,255,0.9)',
+              color: 'var(--text-primary)',
               lineHeight: 1.4
             }}>
               {tooltips.windSpeed}
@@ -766,7 +892,7 @@ export const ControlPanel: React.FC = () => {
               borderRadius: '6px',
               padding: '8px',
               marginBottom: '8px',
-              color: 'rgba(255,255,255,0.9)',
+              color: 'var(--text-primary)',
               lineHeight: 1.4
             }}>
               {tooltips.diffusionRate}
@@ -809,7 +935,7 @@ export const ControlPanel: React.FC = () => {
               borderRadius: '6px',
               padding: '8px',
               marginBottom: '8px',
-              color: 'rgba(255,255,255,0.9)',
+              color: 'var(--text-primary)',
               lineHeight: 1.4
             }}>
               {tooltips.releaseRate}

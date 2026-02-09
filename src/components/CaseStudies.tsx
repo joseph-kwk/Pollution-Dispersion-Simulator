@@ -177,17 +177,20 @@ export const CaseStudies: React.FC = () => {
     // Small delay for visual feedback
     setTimeout(() => {
       // Clear existing sources
-      const currentSources = useSimulationStore.getState().sources;
-      currentSources.forEach((_, index) => {
-        actions.removeSource(index);
-      });
+      actions.setSources([]);
 
       // Update parameters
       actions.updateParameters(caseStudy.parameters);
 
       // Add new sources
+      // We need to ensure we're adding valid sources. 
+      // actions.addSource adds a single source to the array.
       caseStudy.sourceConfig.forEach(source => {
-        actions.addSource(source);
+        actions.addSource({
+          x: source.x,
+          y: source.y,
+          type: source.type
+        });
       });
 
       // Navigate to simulator and start
@@ -291,9 +294,7 @@ export const CaseStudies: React.FC = () => {
 
       <div className="case-studies-footer">
         <p>
-          💡 <strong>Tip:</strong> After loading a scenario, you can adjust parameters
-          to see how changes affect pollution dispersion. Try increasing wind speed
-          or diffusion rate to improve air quality.
+          💡 <strong>Pro Tip:</strong> After loading a scenario, use <strong>Scientist Mode (Spacebar)</strong> to see wind vectors and high-concentration areas clearly. Try adjusting the wind speed to disperse the pollution!
         </p>
       </div>
     </div>
